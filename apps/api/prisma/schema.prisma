@@ -1,0 +1,63 @@
+// Dynamic Form Builder Engine — data model.
+// See docs/03-data-model.md and docs/adr/0003 for the full rationale.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Lifecycle of a form configuration version.
+/// Only PUBLISHED versions accept submissions, and PUBLISHED versions are
+/// treated as immutable — this is what guarantees historical integrity.
+enum FormVersionStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+/// A form's stable logical identity. Carries no field definitions itself; it is
+/// the anchor that versioned configurations hang off.
+model Form {
+  id          String        @id @default(uuid())
+  key         String        @unique
+  name        String
+  description String?
+  versions    FormVersion[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+/// One immutable-once-published configuration of a form. The `schema` column
+/// holds JSON Schema (draft 2020-12); `uiSchema` holds presentation hints.
+model FormVersion {
+  id          String            @id @default(uuid())
+  form        Form              @relation(fields: [formId], references: [id], onDelete: Cascade)
+  formId      String
+  version     Int
+  status      FormVersionStatus @default(DRAFT)
+  schema      Json
+  uiSchema    Json?
+  submissions Submission[]
+  publishedAt DateTime?
+  createdAt   DateTime          @default(now())
+
+  @@unique([formId, version])
+  @@index([formId, status])
+}
+
+/// A user response. `data` is only ever written after passing validation against
+/// the referenced version's schema. `formVersionId` pins the exact (immutable)
+/// configuration that produced it — the historical-integrity link.
+model Submission {
+  id            String      @id @default(uuid())
+  formVersion   FormVersion @relation(fields: [formVersionId], references: [id], onDelete: Restrict)
+  formVersionId String
+  data          Json
+  createdAt     DateTime    @default(now())
+
+  @@index([formVersionId])
+}
