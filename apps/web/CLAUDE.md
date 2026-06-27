@@ -41,6 +41,27 @@ authoring Manage page collide on `/forms/[key]`.
   `uiSchema`, delegating each field to a widget component. Form state via
   **react-hook-form**.
 
+## Components: composition, reuse, shadcn-first
+
+- **Strict DRY.** No duplicated JSX, logic, or styling across components. The second
+  time the same markup, handler, hook logic, or class string appears, extract it —
+  into a shared component, a small hook, or a constant. Repeated Tailwind class lists
+  become a shared component or a `cva`/variant, never copy-paste. If two components
+  differ only in data, they are one component with props.
+- **Compose, don't duplicate.** Build small, reusable components that combine through
+  composition (children/slots) rather than copy-pasted variants or boolean-prop sprawl.
+  Lift shared markup into one component the moment a second caller appears.
+- **Every page splits client/server.** A route's `page.tsx` is a **Server Component**
+  (data fetching, no secrets on the client); the interactive UI lives in a sibling
+  **Client Component** (`*-client.tsx`) it renders. Keep `'use client'` at the leaf,
+  not the page.
+- **shadcn-first — check before you create.** This project uses shadcn/ui
+  (`components/ui/*`). Before writing any new component, confirm there is no shadcn
+  equivalent (and check `components/` for an existing app-level one). Reuse or compose
+  the existing primitive; only hand-roll when nothing fits, and say why.
+- **Don't edit `components/ui/*` to restyle.** Adapt via `className`/props at the call
+  site; only change the primitive itself when fixing the primitive for every caller.
+
 ## Widgets: driven by uiSchema, with safe fallback
 
 - Pick the widget from `uiSchema.fields[name].widget`, falling back to the JSON
