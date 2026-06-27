@@ -58,28 +58,33 @@ export function FormsTable({ forms }: { forms: FormListItem[] }) {
             <TableCell>{form.version}</TableCell>
             <TableCell>{form.submissions}</TableCell>
             <TableCell className="text-muted-foreground">{form.updated}</TableCell>
-            <TableCell>
-              <div className="flex justify-end gap-2">
-                <Button asChild size="sm" variant="outline">
-                  <Link href={`/forms/${form.key}`}>Manage</Link>
-                </Button>
-                {form.status === 'Draft' ? (
-                  <Button size="sm">
-                    <Send data-icon="inline-start" />
+            <TableCell className="px-6">
+              <div className="flex items-center gap-4">
+                <Link
+                  className="font-medium text-primary underline-offset-4 hover:underline"
+                  href={`/forms/${form.key}`}
+                >
+                  Manage
+                </Link>
+                <Link
+                  className="font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                  href={`/f/${form.key}`}
+                >
+                  Preview
+                </Link>
+                {form.status === 'Draft' && (
+                  <Link
+                    className="font-medium text-primary underline-offset-4 hover:underline"
+                    href={`/forms/${form.key}`}
+                  >
                     Publish
-                  </Button>
-                ) : (
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={`/f/${form.key}`}>
-                      <Eye data-icon="inline-start" />
-                      Preview
-                    </Link>
-                  </Button>
+                  </Link>
                 )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
                       aria-label={`More actions for ${form.name}`}
+                      className="ml-auto"
                       size="icon-sm"
                       variant="ghost"
                     >

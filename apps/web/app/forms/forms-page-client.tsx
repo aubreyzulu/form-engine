@@ -73,15 +73,15 @@ export function FormsPageClient() {
   const [statusFilter, setStatusFilter] = useState<FilterOption>('All');
   const [query, setQuery] = useState('');
 
-  const allForms = showSampleForms ? sampleForms : [];
   const forms = useMemo(() => {
+    const source = showSampleForms ? sampleForms : [];
     const term = query.trim().toLowerCase();
-    return allForms.filter((form) => {
+    return source.filter((form) => {
       const matchesStatus = statusFilter === 'All' || form.status === statusFilter;
       const matchesQuery = term === '' || form.name.toLowerCase().includes(term);
       return matchesStatus && matchesQuery;
     });
-  }, [allForms, statusFilter, query]);
+  }, [showSampleForms, statusFilter, query]);
 
   return (
     <CreatorAppShell active="forms">
