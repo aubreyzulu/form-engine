@@ -79,6 +79,25 @@ describe('FormsService', () => {
       });
       expect(prisma.formVersion.update).not.toHaveBeenCalled();
     });
+
+    it('rejects publishing an empty schema', async () => {
+      prisma.form.findUnique.mockResolvedValue({ id: 'f1', key: 'k' });
+      prisma.formVersion.findUnique.mockResolvedValue(
+        draft({
+          schema: {
+            $schema: 'https://json-schema.org/draft/2020-12/schema',
+            type: 'object',
+            properties: {},
+            additionalProperties: false,
+          },
+        }),
+      );
+
+      await expect(service.publish('k', 1)).rejects.toMatchObject({
+        code: ErrorCode.SCHEMA_INVALID,
+      });
+      expect(prisma.formVersion.update).not.toHaveBeenCalled();
+    });
   });
 
   describe('updateDraft (immutability)', () => {
@@ -126,9 +145,9 @@ describe('FormsService', () => {
   describe('createForm', () => {
     it('rejects a duplicate key (409 FORM_KEY_TAKEN)', async () => {
       prisma.form.findUnique.mockResolvedValue({ id: 'f1', key: 'taken' });
-      await expect(
-        service.createForm({ key: 'taken', name: 'X' }),
-      ).rejects.toMatchObject({ code: ErrorCode.FORM_KEY_TAKEN });
+      await expect(service.createForm({ key: 'taken', name: 'X' })).rejects.toMatchObject({
+        code: ErrorCode.FORM_KEY_TAKEN,
+      });
     });
 
     it('rejects an invalid initial schema (422 SCHEMA_INVALID)', async () => {
@@ -160,6 +179,31 @@ describe('FormsService', () => {
           uiSchema: { order: ['ghost'] },
         }),
       ).rejects.toMatchObject({ code: ErrorCode.UI_SCHEMA_INVALID });
+    });
+
+    it('rejects duplicate uiSchema order entries (422 UI_SCHEMA_INVALID)', async () => {
+      await expect(
+        service.createForm({
+          key: 'k',
+          name: 'X',
+          schema: VALID_SCHEMA,
+          uiSchema: { order: ['name', 'name'] },
+        }),
+      ).rejects.toMatchObject({ code: ErrorCode.UI_SCHEMA_INVALID });
+    });
+
+    it('rejects impossible validation ranges (422 UNSUPPORTED_FIELD_TYPE)', async () => {
+      await expect(
+        service.createForm({
+          key: 'k',
+          name: 'X',
+          schema: {
+            $schema: 'https://json-schema.org/draft/2020-12/schema',
+            type: 'object',
+            properties: { score: { type: 'number', minimum: 10, maximum: 2 } },
+          },
+        }),
+      ).rejects.toMatchObject({ code: ErrorCode.UNSUPPORTED_FIELD_TYPE });
     });
   });
 
