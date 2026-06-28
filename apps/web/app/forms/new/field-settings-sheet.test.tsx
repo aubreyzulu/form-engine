@@ -76,4 +76,27 @@ describe('FieldSettingsSheet', () => {
     );
     expect(screen.getByRole('button', { name: 'Apply changes' })).toBeDisabled();
   });
+
+  it('blocks invalid validation ranges', async () => {
+    const user = userEvent.setup();
+    const onApply = vi.fn();
+
+    render(
+      <FieldSettingsSheet
+        field={{
+          ...dropdownField,
+          type: fieldType('short-text'),
+          options: undefined,
+        }}
+        onApply={onApply}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await user.type(screen.getByLabelText('Min length'), '10');
+    await user.type(screen.getByLabelText('Max length'), '2');
+
+    expect(screen.getByText('Minimum cannot be greater than maximum.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Apply changes' })).toBeDisabled();
+  });
 });

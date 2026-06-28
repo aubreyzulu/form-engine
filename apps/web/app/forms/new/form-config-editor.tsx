@@ -104,8 +104,8 @@ export function FormConfigEditor({
 
       {!isValid && (
         <ul className="space-y-1 border-t bg-destructive/5 px-6 py-4 text-xs text-destructive">
-          {result.errors.map((error, index) => (
-            <li className="list-inside list-disc" key={index}>
+          {result.errors.map((error) => (
+            <li className="list-inside list-disc" key={error}>
               {error}
             </li>
           ))}

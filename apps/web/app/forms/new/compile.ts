@@ -224,6 +224,7 @@ export function decompile(config: FormConfig): {
       ? (schema.properties as Record<string, unknown>)
       : {};
   const required = isStringArray(schema.required) ? schema.required : [];
+  const requiredFields = new Set(required);
   const uiFields =
     uiSchema.fields && typeof uiSchema.fields === 'object'
       ? (uiSchema.fields as Record<string, UiFieldConfig>)
@@ -250,7 +251,7 @@ export function decompile(config: FormConfig): {
       key,
       label: ui.label ?? key,
       type: fieldType(typeId),
-      required: required.includes(key),
+      required: requiredFields.has(key),
     };
     if (ui.help) field.helperText = ui.help;
     if (ui.placeholder) field.placeholder = ui.placeholder;

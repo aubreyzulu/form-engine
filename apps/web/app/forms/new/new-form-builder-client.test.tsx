@@ -1,8 +1,13 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { NewFormBuilderClient } from '@/app/forms/new/new-form-builder-client';
+import { BUILDER_MODE_TOUR_STORAGE_KEY } from '@/app/forms/new/builder-mode-tour';
+import { fieldType } from '@/app/forms/new/field-types';
+import { formsKeys } from '@/lib/query-keys';
 
 const refresh = vi.hoisted(() => vi.fn());
 const push = vi.hoisted(() => vi.fn());
@@ -39,6 +44,30 @@ function mockResizeObserver() {
 
 const originalApiUrl = process.env.NEXT_PUBLIC_API_URL;
 
+function createTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+      mutations: {
+        retry: false,
+      },
+    },
+  });
+}
+
+function renderWithQueryClient(
+  props: ComponentProps<typeof NewFormBuilderClient> = {},
+  queryClient = createTestQueryClient(),
+) {
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <NewFormBuilderClient {...props} />
+    </QueryClientProvider>,
+  );
+}
+
 function okResponse(body: Record<string, unknown> = {}): Response {
   return {
     ok: true,
@@ -60,6 +89,7 @@ describe('NewFormBuilderClient', () => {
     mockMatchMedia();
     mockResizeObserver();
     process.env.NEXT_PUBLIC_API_URL = 'http://localhost:4000/api/v1';
+    window.localStorage.setItem(BUILDER_MODE_TOUR_STORAGE_KEY, 'seen');
     vi.spyOn(crypto, 'randomUUID').mockReturnValue('12345678-1234-4234-9234-123456789abc');
     refresh.mockClear();
     push.mockClear();
@@ -68,6 +98,7 @@ describe('NewFormBuilderClient', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    window.localStorage.clear();
     if (originalApiUrl === undefined) {
       delete process.env.NEXT_PUBLIC_API_URL;
     } else {
@@ -80,7 +111,7 @@ describe('NewFormBuilderClient', () => {
     const fetchMock = vi.fn().mockResolvedValue(okResponse());
     vi.stubGlobal('fetch', fetchMock);
 
-    render(<NewFormBuilderClient />);
+    renderWithQueryClient();
 
     await user.type(screen.getByLabelText('Form name'), 'Ownership Declaration');
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
@@ -105,7 +136,7 @@ describe('NewFormBuilderClient', () => {
     const fetchMock = vi.fn().mockResolvedValue(okResponse());
     vi.stubGlobal('fetch', fetchMock);
 
-    render(<NewFormBuilderClient />);
+    renderWithQueryClient();
 
     await user.type(screen.getByLabelText('Form name'), 'Ownership Declaration');
     await user.click(screen.getByRole('button', { name: 'Add field' }));
@@ -128,7 +159,7 @@ describe('NewFormBuilderClient', () => {
     const fetchMock = vi.fn().mockResolvedValue(okResponse());
     vi.stubGlobal('fetch', fetchMock);
 
-    render(<NewFormBuilderClient />);
+    renderWithQueryClient();
 
     await user.type(screen.getByLabelText('Form name'), 'Ownership Declaration');
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
@@ -166,7 +197,7 @@ describe('NewFormBuilderClient', () => {
       .mockResolvedValueOnce(okResponse());
     vi.stubGlobal('fetch', fetchMock);
 
-    render(<NewFormBuilderClient />);
+    renderWithQueryClient();
 
     await user.type(screen.getByLabelText('Form name'), 'Ownership Declaration');
     await user.click(screen.getByRole('button', { name: 'Add field' }));
@@ -193,5 +224,67 @@ describe('NewFormBuilderClient', () => {
       'http://localhost:4000/api/v1/forms/ownership-declaration-12345678/versions/1/publish',
       expect.objectContaining({ method: 'POST' }),
     );
+  });
+
+  it('previews the current builder fields without saving', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderWithQueryClient();
+
+    await user.type(screen.getByLabelText('Form name'), 'Supplier Check');
+    await user.click(screen.getByRole('button', { name: 'Add field' }));
+    await user.click(screen.getByText('Short Text'));
+    await user.click(screen.getByRole('button', { name: 'Apply changes' }));
+    await user.click(screen.getByRole('button', { name: 'Live preview' }));
+
+    expect(screen.getByRole('dialog')).toHaveTextContent('Supplier Check');
+    expect(screen.getByRole('dialog')).toHaveTextContent('Short Text');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('saves edits to a hydrated draft without creating a duplicate form', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue(okResponse());
+    vi.stubGlobal('fetch', fetchMock);
+    const versionKey = formsKeys.version('supplier-check', 3);
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(versionKey, {
+      id: 'version-3',
+      updatedAt: '2026-06-28T10:00:00.000Z',
+    });
+
+    renderWithQueryClient(
+      {
+        draftIdentity: { key: 'supplier-check', version: 3 },
+        initialValue: {
+          name: 'Supplier Check',
+          description: '',
+          fields: [
+            {
+              id: 'field-1',
+              key: 'supplierName',
+              label: 'Supplier name',
+              type: fieldType('short-text'),
+              required: true,
+            },
+          ],
+        },
+      },
+      queryClient,
+    );
+
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+
+    await user.type(screen.getByLabelText('Form description'), 'Updated draft');
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:4000/api/v1/forms/supplier-check/versions/3',
+      expect.objectContaining({ method: 'PATCH' }),
+    );
+    expect(queryClient.getQueryState(versionKey)?.isInvalidated).toBe(true);
   });
 });
