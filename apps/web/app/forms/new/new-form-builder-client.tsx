@@ -166,6 +166,8 @@ export function NewFormBuilderClient() {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
+                name: trimmedName,
+                description: description.trim() || null,
                 schema: config.schema,
                 uiSchema: config.uiSchema,
               }),

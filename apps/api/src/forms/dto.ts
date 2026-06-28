@@ -77,6 +77,25 @@ export class CreateVersionDto {
 
 export class UpdateVersionDto {
   @ApiPropertyOptional({
+    description: 'Updated form display name stored with the form metadata.',
+    example: 'Beneficial Ownership Declaration',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  name?: string;
+
+  @ApiPropertyOptional({
+    description: 'Updated form description stored with the form metadata. Use null to clear it.',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  description?: string | null;
+
+  @ApiPropertyOptional({
     description: 'Replacement JSON Schema for the draft version.',
   })
   @IsOptional()

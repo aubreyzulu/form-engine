@@ -189,12 +189,15 @@ function decompileOptions(
   if (isBuilderOptions(ui['x-options'])) {
     const values = ui['x-options'].map((option) => option.value);
     const schemaValueSet = new Set(schemaValues);
-    const matchesSchema =
+    const hasSameSchemaValues =
       new Set(values).size === values.length &&
       values.length === schemaValues.length &&
       values.every((value) => schemaValueSet.has(value));
 
-    if (matchesSchema) return ui['x-options'];
+    if (hasSameSchemaValues) {
+      const optionsByValue = new Map(ui['x-options'].map((option) => [option.value, option]));
+      return schemaValues.map((value) => optionsByValue.get(value) ?? { label: value, value });
+    }
   }
 
   return schemaValues.map((value) => ({ label: value, value }));

@@ -134,6 +134,7 @@ describe('NewFormBuilderClient', () => {
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
+    await user.type(screen.getByLabelText('Form description'), 'Updated disclosure form');
     await user.click(screen.getByRole('button', { name: 'Add field' }));
     await user.click(screen.getByText('Short Text'));
     await user.click(screen.getByRole('button', { name: 'Apply changes' }));
@@ -145,6 +146,10 @@ describe('NewFormBuilderClient', () => {
       'http://localhost:4000/api/v1/forms/ownership-declaration-12345678/versions/1',
       expect.objectContaining({ method: 'PATCH' }),
     );
+    expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toMatchObject({
+      name: 'Ownership Declaration',
+      description: 'Updated disclosure form',
+    });
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
       'http://localhost:4000/api/v1/forms/ownership-declaration-12345678/versions/1/publish',
@@ -176,6 +181,11 @@ describe('NewFormBuilderClient', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
       'http://localhost:4000/api/v1/forms',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'http://localhost:4000/api/v1/forms/ownership-declaration-12345678/versions/1/publish',
       expect.objectContaining({ method: 'POST' }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(

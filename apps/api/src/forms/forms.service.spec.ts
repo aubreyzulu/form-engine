@@ -7,7 +7,7 @@ import { FormsService } from './forms.service';
 /** Minimal hand-rolled Prisma mock — we assert on the service rules, not the ORM. */
 function createPrismaMock() {
   return {
-    form: { findUnique: jest.fn(), create: jest.fn(), findMany: jest.fn() },
+    form: { findUnique: jest.fn(), create: jest.fn(), findMany: jest.fn(), update: jest.fn() },
     formVersion: {
       findUnique: jest.fn(),
       findFirst: jest.fn(),
@@ -110,6 +110,25 @@ describe('FormsService', () => {
       expect(prisma.formVersion.update).toHaveBeenCalled();
     });
 
+    it('persists form metadata while editing a DRAFT version', async () => {
+      prisma.form.findUnique.mockResolvedValue({ id: 'f1', key: 'k' });
+      prisma.formVersion.findUnique.mockResolvedValue(draft());
+      prisma.form.update.mockResolvedValue({ id: 'f1', key: 'k' });
+      prisma.formVersion.update.mockResolvedValue(draft());
+
+      await service.updateDraft('k', 1, {
+        name: 'Updated declaration',
+        description: null,
+        schema: VALID_SCHEMA,
+      });
+
+      expect(prisma.form.update).toHaveBeenCalledWith({
+        where: { id: 'f1' },
+        data: { name: 'Updated declaration', description: null },
+      });
+      expect(prisma.formVersion.update).toHaveBeenCalled();
+    });
+
     it('refuses to edit a PUBLISHED version — the historical-integrity guarantee', async () => {
       prisma.form.findUnique.mockResolvedValue({ id: 'f1', key: 'k' });
       prisma.formVersion.findUnique.mockResolvedValue(draft({ status: 'PUBLISHED' }));
@@ -117,6 +136,7 @@ describe('FormsService', () => {
       await expect(service.updateDraft('k', 1, { schema: VALID_SCHEMA })).rejects.toBeInstanceOf(
         AppException,
       );
+      expect(prisma.form.update).not.toHaveBeenCalled();
       expect(prisma.formVersion.update).not.toHaveBeenCalled();
     });
   });

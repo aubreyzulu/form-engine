@@ -207,6 +207,16 @@ export class FormsService {
     const effectiveUiSchema = dto.uiSchema ?? existing.uiSchema;
     this.assertUiSchemaReferences(effectiveSchema, effectiveUiSchema);
 
+    if (dto.name !== undefined || dto.description !== undefined) {
+      await this.prisma.form.update({
+        where: { id: form.id },
+        data: {
+          ...(dto.name !== undefined ? { name: dto.name } : {}),
+          ...(dto.description !== undefined ? { description: dto.description } : {}),
+        },
+      });
+    }
+
     return this.prisma.formVersion.update({
       where: { id: existing.id },
       data: {

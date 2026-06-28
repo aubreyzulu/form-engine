@@ -144,7 +144,7 @@ describe('decompile', () => {
     ]);
   });
 
-  it('keeps option labels when uiSchema metadata has the same values in a different order', () => {
+  it('keeps option labels while normalizing uiSchema metadata to schema order', () => {
     const config = {
       schema: {
         type: 'object',
@@ -168,8 +168,8 @@ describe('decompile', () => {
     } as unknown as FormConfig;
 
     expect(decompile(config).fields[0]?.options).toEqual([
-      { label: 'Inactive company', value: 'inactive' },
       { label: 'Active company', value: 'active' },
+      { label: 'Inactive company', value: 'inactive' },
     ]);
   });
 

@@ -142,6 +142,7 @@ describe('FormConfigEditor', () => {
 
     await user.click(screen.getByRole('button', { name: 'Copy' }));
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument());
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('button', { name: 'Copied' })).not.toBeInTheDocument();
   });
 });
