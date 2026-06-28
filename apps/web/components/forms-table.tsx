@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { MoreVertical } from 'lucide-react';
 
-import { FormStatusBadge, type FormStatus } from '@/components/form-status-badge';
+import { FormStatusBadge } from '@/components/form-status-badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -18,15 +18,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { type FormListItem } from '@/lib/form-list';
 
-export type FormListItem = {
-  key: string;
-  name: string;
-  status: FormStatus;
-  version: string;
-  submissions: number;
-  updated: string;
-};
+export type { FormListItem } from '@/lib/form-list';
 
 export function FormsTable({ forms }: { forms: FormListItem[] }) {
   return (
@@ -66,12 +60,16 @@ export function FormsTable({ forms }: { forms: FormListItem[] }) {
                 >
                   Manage
                 </Link>
-                <Link
-                  className="font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-                  href={`/f/${form.key}`}
-                >
-                  Preview
-                </Link>
+                {form.publishedVersion ? (
+                  <Link
+                    className="font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                    href={`/f/${form.key}`}
+                  >
+                    Open live form
+                  </Link>
+                ) : (
+                  <span className="font-medium text-muted-foreground/70">No live form</span>
+                )}
                 {form.status === 'Draft' && (
                   <Link
                     className="font-medium text-primary underline-offset-4 hover:underline"

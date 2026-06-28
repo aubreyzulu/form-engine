@@ -114,7 +114,10 @@ export function CreatorAppShell({
 
         <SidebarFooter className="gap-5 px-6 py-6">
           <Separator />
-          <button className="flex items-center justify-between gap-3 text-left text-sm">
+          <button
+            className="flex items-center justify-between gap-3 text-left text-sm"
+            type="button"
+          >
             <span className="flex items-center gap-3">
               <span className="flex size-9 items-center justify-center rounded-full bg-muted text-xs font-medium">
                 CO
@@ -124,7 +127,7 @@ export function CreatorAppShell({
             <ChevronDown />
           </button>
           <Separator />
-          <button className="flex items-center gap-3 text-sm text-muted-foreground">
+          <button className="flex items-center gap-3 text-sm text-muted-foreground" type="button">
             <ChevronLeft />
             <span>Collapse</span>
           </button>

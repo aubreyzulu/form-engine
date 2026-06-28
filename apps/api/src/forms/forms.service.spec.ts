@@ -279,16 +279,24 @@ describe('FormsService', () => {
   });
 
   describe('getFormForManage (authoring read)', () => {
-    it('returns the latest version of any status plus the submission count', async () => {
+    it('returns the latest version, published version, and submission count', async () => {
       prisma.form.findUnique.mockResolvedValue({ id: 'f1', key: 'k' });
-      prisma.formVersion.findFirst.mockResolvedValue(draft({ version: 2 }));
+      prisma.formVersion.findFirst
+        .mockResolvedValueOnce(draft({ version: 2, status: 'DRAFT' }))
+        .mockResolvedValueOnce(draft({ version: 1, status: 'PUBLISHED' }));
       prisma.submission.count.mockResolvedValue(7);
 
       const result = await service.getFormForManage('k');
       expect(result.version.version).toBe(2);
+      expect(result.publishedVersion).toBe(1);
       expect(result.submissionCount).toBe(7);
-      expect(prisma.formVersion.findFirst).toHaveBeenCalledWith(
+      expect(prisma.formVersion.findFirst).toHaveBeenNthCalledWith(
+        1,
         expect.objectContaining({ orderBy: { version: 'desc' } }),
+      );
+      expect(prisma.formVersion.findFirst).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ where: { formId: 'f1', status: 'PUBLISHED' } }),
       );
     });
   });
