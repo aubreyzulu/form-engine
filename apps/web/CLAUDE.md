@@ -14,8 +14,8 @@ journeys are in `docs/11-user-journeys.md`, the design in `docs/06-frontend.md`.
 - **Authoring** (`/forms`, `/forms/new`, `/forms/[key]`): a guided **field builder**
   for a **non-technical** creator. They never see JSON and never drag — they add
   fields and **click a field to edit it in a right-side drawer** (label, required,
-  validation rules). The builder **compiles plain-language field types to JSON Schema
-  + uiSchema**; reorder is up/down buttons. Live preview reuses the renderer.
+  validation rules). The builder compiles plain-language field types to JSON Schema
+  and uiSchema; reorder is up/down buttons. Live preview reuses the renderer.
 - **Fill** (`/f/[key]`): fetch a **stored config** and render it dynamically, submit,
   surface validation + the three UI states. The renderer must never assume a fixed,
   hardcoded field set — it renders whatever config the API returns.
@@ -73,6 +73,7 @@ authoring Manage page collide on `/forms/[key]`.
 ## The three UI states (required, first-class)
 
 Every data interaction handles all three explicitly:
+
 - **Loading** — skeleton while fetching the config; disabled + spinner on submit.
 - **Error** — config-fetch/network/5xx shows an inline error with retry; submit-time
   `422` maps to field errors.
@@ -85,6 +86,18 @@ Every data interaction handles all three explicitly:
   and `aria-describedby`; mark required fields semantically.
 - Announce submit-time errors via an `aria-live` region. Keyboard and focus states
   must work.
+
+## PR review rules
+
+- Check for DRY issues in components, hooks, class strings, schema-to-field
+  mapping, form state handling, and API client code.
+- Check edge cases around empty forms, no fields, invalid JSON edits, duplicate
+  option values, unsupported schema widgets, network failures, and server `422`s.
+- Check regressions in builder-to-schema round-tripping, label/value option
+  preservation, type transitions, and loading/error/success states.
+- Check idempotency for save-draft, publish, retry, and state rehydration flows.
+- Prefer inline PR review comments over summary-only feedback. Tag the PR author
+  in inline comments when the review platform supports mentions.
 
 ## Conventions
 

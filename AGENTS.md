@@ -1,5 +1,9 @@
 # AGENTS.md — Dynamic Form Builder Engine (root)
 
+This file is a Codex compatibility entry point. The source of truth for project
+instructions is `CLAUDE.md` in this directory. Read `./CLAUDE.md` before touching
+code; if this file and `CLAUDE.md` ever disagree, follow `CLAUDE.md`.
+
 Monorepo for the OpenOwnership full-stack assessment (**Assignment A**). Read this
 before touching anything; backend- and frontend-specific rules live in
 `apps/api/AGENTS.md` and `apps/web/AGENTS.md` respectively.
