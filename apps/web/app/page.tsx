@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v1';
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const paths = [
   {
@@ -96,7 +96,9 @@ export default function HomePage() {
           <span>
             Assignment scope: authoring, fill, validation, and version-pinned submissions.
           </span>
-          <code className="w-fit rounded bg-muted px-2 py-1 text-foreground">{API_URL}</code>
+          <code className="w-fit rounded bg-muted px-2 py-1 text-foreground">
+            {API_URL ?? 'NEXT_PUBLIC_API_URL not configured'}
+          </code>
         </footer>
       </section>
     </main>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { compileForm, decompile, type FormConfig } from '@/app/forms/new/compile';
+import { compileForm, decompile, parseConfig, type FormConfig } from '@/app/forms/new/compile';
 import { fieldType, type BuilderField } from '@/app/forms/new/field-types';
 
 function optionField(typeId: 'dropdown' | 'checkboxes'): BuilderField {
@@ -113,5 +113,105 @@ describe('decompile', () => {
         { label: 'director', value: 'director' },
       ],
     });
+  });
+
+  it('falls back to schema option values when uiSchema metadata drifts', () => {
+    const config = {
+      schema: {
+        type: 'object',
+        properties: {
+          status: { type: 'string', enum: ['active', 'inactive'] },
+        },
+      },
+      uiSchema: {
+        order: ['status'],
+        fields: {
+          status: {
+            widget: 'select',
+            label: 'Status',
+            'x-options': [
+              { label: 'Active company', value: 'active' },
+              { label: 'Dormant company', value: 'dormant' },
+            ],
+          },
+        },
+      },
+    } as unknown as FormConfig;
+
+    expect(decompile(config).fields[0]?.options).toEqual([
+      { label: 'active', value: 'active' },
+      { label: 'inactive', value: 'inactive' },
+    ]);
+  });
+
+  it('keeps option labels while normalizing uiSchema metadata to schema order', () => {
+    const config = {
+      schema: {
+        type: 'object',
+        properties: {
+          status: { type: 'string', enum: ['active', 'inactive'] },
+        },
+      },
+      uiSchema: {
+        order: ['status'],
+        fields: {
+          status: {
+            widget: 'select',
+            label: 'Status',
+            'x-options': [
+              { label: 'Inactive company', value: 'inactive' },
+              { label: 'Active company', value: 'active' },
+            ],
+          },
+        },
+      },
+    } as unknown as FormConfig;
+
+    expect(decompile(config).fields[0]?.options).toEqual([
+      { label: 'Active company', value: 'active' },
+      { label: 'Inactive company', value: 'inactive' },
+    ]);
+  });
+
+  it('de-duplicates repeated uiSchema order entries while rebuilding fields', () => {
+    const config: FormConfig = {
+      schema: {
+        type: 'object',
+        properties: {
+          status: { type: 'string', enum: ['active', 'inactive'] },
+        },
+      },
+      uiSchema: {
+        order: ['status', 'status'],
+        fields: {
+          status: { widget: 'select', label: 'Status' },
+        },
+      },
+    };
+
+    expect(decompile(config).fields).toHaveLength(1);
+  });
+});
+
+describe('parseConfig', () => {
+  it('rejects duplicate ordered keys', () => {
+    const result = parseConfig(`{
+      "schema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["active", "inactive"] }
+        }
+      },
+      "uiSchema": {
+        "order": ["status", "status"],
+        "fields": {
+          "status": { "widget": "select", "label": "Status" }
+        }
+      }
+    }`);
+
+    expect(result.config).toBeNull();
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]).toContain('duplicate property "status"');
   });
 });

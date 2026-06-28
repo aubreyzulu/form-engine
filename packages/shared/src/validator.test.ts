@@ -116,7 +116,10 @@ describe('validateUiSchemaReferences', () => {
   });
 
   it('accepts a uiSchema whose order/fields all exist in the schema', () => {
-    const ui = { order: ['fullName', 'country'], fields: { ownershipPercent: { widget: 'number' } } };
+    const ui = {
+      order: ['fullName', 'country'],
+      fields: { ownershipPercent: { widget: 'number' } },
+    };
     expect(validateUiSchemaReferences(schema, ui).valid).toBe(true);
   });
 
@@ -125,6 +128,26 @@ describe('validateUiSchemaReferences', () => {
     const result = validateUiSchemaReferences(schema, ui);
     expect(result.valid).toBe(false);
     expect(result.errors.map((e) => e.field).sort()).toEqual(['ghost', 'phantom']);
+  });
+
+  it('rejects duplicate and non-string uiSchema order entries', () => {
+    const ui = { order: ['fullName', 'fullName', 42] };
+    const result = validateUiSchemaReferences(schema, ui);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: 'fullName',
+          keyword: 'uiSchema',
+          message: 'uiSchema.order contains duplicate property "fullName"',
+        }),
+        expect.objectContaining({
+          field: 'order.2',
+          keyword: 'uiSchema',
+          message: 'uiSchema.order[2] must be a string',
+        }),
+      ]),
+    );
   });
 });
 
@@ -182,6 +205,34 @@ describe('validateSupportedFields', () => {
     });
     expect(result.valid).toBe(false);
     expect(result.errors[0]).toMatchObject({ field: 'tags', keyword: 'items' });
+  });
+
+  it('rejects array fields without uniqueItems true', () => {
+    const result = validateSupportedFields({
+      type: 'object',
+      properties: { tags: { type: 'array', items: { type: 'string', enum: ['a', 'b'] } } },
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({ field: 'tags', keyword: 'uniqueItems' }),
+    );
+  });
+
+  it('rejects impossible string and number ranges', () => {
+    const result = validateSupportedFields({
+      type: 'object',
+      properties: {
+        name: { type: 'string', minLength: 10, maxLength: 2 },
+        count: { type: 'number', minimum: 5, maximum: 1 },
+      },
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ field: 'name', keyword: 'minLength' }),
+        expect.objectContaining({ field: 'count', keyword: 'minimum' }),
+      ]),
+    );
   });
 
   it('rejects a non-object root', () => {

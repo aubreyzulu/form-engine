@@ -161,15 +161,25 @@ function parseField(
     readOptionalNumber(object.max, `${path}.max`, errors, (value) => {
       field.max = value;
     });
+    if (field.min !== undefined && field.max !== undefined && field.min > field.max) {
+      errors.push(`${path}.min must be less than or equal to ${path}.max.`);
+    }
   }
 
   if (typeId === 'short-text' || typeId === 'long-text') {
-    readOptionalNumber(object.minLength, `${path}.minLength`, errors, (value) => {
+    readOptionalNonNegativeInteger(object.minLength, `${path}.minLength`, errors, (value) => {
       field.minLength = value;
     });
-    readOptionalNumber(object.maxLength, `${path}.maxLength`, errors, (value) => {
+    readOptionalNonNegativeInteger(object.maxLength, `${path}.maxLength`, errors, (value) => {
       field.maxLength = value;
     });
+    if (
+      field.minLength !== undefined &&
+      field.maxLength !== undefined &&
+      field.minLength > field.maxLength
+    ) {
+      errors.push(`${path}.minLength must be less than or equal to ${path}.maxLength.`);
+    }
   }
 
   if (typeId === 'dropdown' || typeId === 'checkboxes') {
@@ -195,16 +205,17 @@ function parseOptions(value: unknown, path: string, errors: string[]): BuilderOp
     const optionPath = `${path}[${index}]`;
 
     if (typeof raw === 'string') {
-      if (!raw.trim()) {
+      const option = raw.trim();
+      if (!option) {
         errors.push(`${optionPath} must not be empty.`);
         return;
       }
-      if (usedValues.has(raw)) {
+      if (usedValues.has(option)) {
         errors.push(`${optionPath} value must be unique.`);
         return;
       }
-      usedValues.add(raw);
-      options.push({ label: raw, value: raw });
+      usedValues.add(option);
+      options.push({ label: option, value: option });
       return;
     }
 
@@ -215,7 +226,7 @@ function parseOptions(value: unknown, path: string, errors: string[]): BuilderOp
 
     const object = raw as Record<string, unknown>;
     const label = readRequiredString(object.label, `${optionPath}.label`, errors);
-    const value = readRequiredString(object.value, `${optionPath}.value`, errors);
+    const value = readRequiredString(object.value, `${optionPath}.value`, errors).trim();
     if (!label || !value) return;
 
     if (usedValues.has(value)) {
@@ -254,4 +265,18 @@ function readOptionalNumber(
     return;
   }
   errors.push(`${path} must be a number.`);
+}
+
+function readOptionalNonNegativeInteger(
+  value: unknown,
+  path: string,
+  errors: string[],
+  apply: (value: number) => void,
+) {
+  if (value === undefined) return;
+  if (typeof value === 'number' && Number.isInteger(value) && value >= 0) {
+    apply(value);
+    return;
+  }
+  errors.push(`${path} must be a non-negative integer.`);
 }

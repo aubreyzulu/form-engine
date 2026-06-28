@@ -60,6 +60,19 @@ shared package instead.
   style paths get tests, not just happy-path smoke checks.
 - Every line must be explainable. If you can't justify it, don't commit it.
 
+## PR review rules
+
+- Check for missed DRY opportunities: duplicated logic, markup, validation,
+  queries, or config mapping should be called out.
+- Check edge cases, especially empty states, malformed input, missing config,
+  network/database failures, and unsupported schema shapes.
+- Check for regressions against configuration-driven validation and historical
+  integrity before style or preference comments.
+- Check idempotency for setup, seed, migration, retry, publish, and background
+  operations. Re-running the same action should not corrupt state.
+- Prefer inline PR review comments over summary-only feedback. Tag the PR author
+  in inline comments when the review platform supports mentions.
+
 ## Workflow
 
 - Commit only when the user asks. Keep commits atomic and messages explanatory.

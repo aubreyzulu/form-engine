@@ -184,13 +184,32 @@ function decompileOptions(
   prop: Record<string, unknown>,
   ui: BuilderUiFieldConfig,
 ): BuilderOption[] {
-  if (isBuilderOptions(ui['x-options'])) return ui['x-options'];
+  const schemaValues = schemaOptionValues(prop);
+
+  if (isBuilderOptions(ui['x-options'])) {
+    const values = ui['x-options'].map((option) => option.value);
+    const schemaValueSet = new Set(schemaValues);
+    const hasSameSchemaValues =
+      new Set(values).size === values.length &&
+      values.length === schemaValues.length &&
+      values.every((value) => schemaValueSet.has(value));
+
+    if (hasSameSchemaValues) {
+      const optionsByValue = new Map(ui['x-options'].map((option) => [option.value, option]));
+      return schemaValues.map((value) => optionsByValue.get(value) ?? { label: value, value });
+    }
+  }
+
+  return schemaValues.map((value) => ({ label: value, value }));
+}
+
+function schemaOptionValues(prop: Record<string, unknown>): string[] {
   if (prop.type === 'array') {
     const items =
       prop.items && typeof prop.items === 'object' ? (prop.items as Record<string, unknown>) : {};
-    return isStringArray(items.enum) ? items.enum.map((value) => ({ label: value, value })) : [];
+    return isStringArray(items.enum) ? items.enum : [];
   }
-  return isStringArray(prop.enum) ? prop.enum.map((value) => ({ label: value, value })) : [];
+  return isStringArray(prop.enum) ? prop.enum : [];
 }
 
 /** Inverse of {@link compileForm}: rebuild editable builder state from a config. */
@@ -211,7 +230,7 @@ export function decompile(config: FormConfig): {
       : {};
   const order =
     Array.isArray(uiSchema.order) && uiSchema.order.length > 0
-      ? uiSchema.order
+      ? Array.from(new Set(uiSchema.order.filter((key): key is string => typeof key === 'string')))
       : Object.keys(properties);
 
   const fields: BuilderField[] = [];

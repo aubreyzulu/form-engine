@@ -261,10 +261,9 @@ function OptionsEditor({
   update: (patch: Partial<BuilderField>) => void;
 }) {
   const options = draft.options ?? [];
+  const normalizedValues = options.map((option) => option.value.trim());
   const duplicateValues = new Set(
-    options
-      .map((option) => option.value)
-      .filter((value, index, values) => value && values.indexOf(value) !== index),
+    normalizedValues.filter((value, index, values) => value && values.indexOf(value) !== index),
   );
 
   return (
@@ -290,7 +289,7 @@ function OptionsEditor({
               value={option.label}
             />
             <Input
-              aria-invalid={duplicateValues.has(option.value)}
+              aria-invalid={duplicateValues.has(option.value.trim())}
               aria-label={`Option ${index + 1} submitted value`}
               onChange={(event) =>
                 update({

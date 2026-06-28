@@ -73,6 +73,18 @@ a slug, etc.).
   the submission flow, `422`-with-no-write, `404`s, and the error envelope shape.
 - Run: `pnpm --filter api test` / `test:e2e`.
 
+## PR review rules
+
+- Check for DRY issues in DTOs, service methods, Prisma query shapes, error
+  mapping, and validation orchestration.
+- Check edge cases around missing forms/versions, duplicate keys, malformed
+  schemas, unknown uiSchema references, invalid submissions, and empty result sets.
+- Check regressions against published-version immutability and version-pinned
+  submissions before commenting on style.
+- Check idempotency for seeds, migrations, publish/create-draft flows, and retries.
+- Prefer inline PR review comments over summary-only feedback. Tag the PR author
+  in inline comments when the review platform supports mentions.
+
 ## Conventions
 
 - Strict TS; no `any` (lint warns). Type Prisma results; don't cast away safety.

@@ -7,12 +7,7 @@ import {
   validateUiSchemaReferences,
 } from '@formbuilder/shared';
 
-import {
-  ConflictError,
-  ErrorCode,
-  NotFoundError,
-  UnprocessableError,
-} from '../common/errors';
+import { ConflictError, ErrorCode, NotFoundError, UnprocessableError } from '../common/errors';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateFormDto, CreateVersionDto, UpdateVersionDto } from './dto';
 
@@ -212,6 +207,16 @@ export class FormsService {
     const effectiveUiSchema = dto.uiSchema ?? existing.uiSchema;
     this.assertUiSchemaReferences(effectiveSchema, effectiveUiSchema);
 
+    if (dto.name !== undefined || dto.description !== undefined) {
+      await this.prisma.form.update({
+        where: { id: form.id },
+        data: {
+          ...(dto.name !== undefined ? { name: dto.name } : {}),
+          ...(dto.description !== undefined ? { description: dto.description } : {}),
+        },
+      });
+    }
+
     return this.prisma.formVersion.update({
       where: { id: existing.id },
       data: {
@@ -233,6 +238,7 @@ export class FormsService {
     }
     this.assertValidSchema(existing.schema);
     this.assertUiSchemaReferences(existing.schema, existing.uiSchema);
+    this.assertPublishable(existing.schema);
 
     return this.prisma.formVersion.update({
       where: { id: existing.id },
@@ -320,5 +326,25 @@ export class FormsService {
         result.errors,
       );
     }
+  }
+
+  private assertPublishable(schema: unknown): void {
+    if (!schema || typeof schema !== 'object') return;
+    const properties = (schema as JsonSchema).properties;
+    const fieldCount =
+      properties && typeof properties === 'object' ? Object.keys(properties).length : 0;
+    if (fieldCount > 0) return;
+
+    throw new UnprocessableError(
+      ErrorCode.SCHEMA_INVALID,
+      'A published form must contain at least one field.',
+      [
+        {
+          field: '',
+          keyword: 'properties',
+          message: 'published form must contain at least one field',
+        },
+      ],
+    );
   }
 }

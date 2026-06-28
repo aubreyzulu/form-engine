@@ -65,7 +65,10 @@ export function validateSubmission(schema: JsonSchema, data: unknown): Validatio
  * property would render (or order) a field that has no validation rule — a
  * broken config we refuse to create or publish. Empty/absent uiSchema is valid.
  */
-export function validateUiSchemaReferences(schema: JsonSchema, uiSchema: unknown): ValidationResult {
+export function validateUiSchemaReferences(
+  schema: JsonSchema,
+  uiSchema: unknown,
+): ValidationResult {
   if (uiSchema === null || typeof uiSchema !== 'object') {
     return { valid: true, errors: [] };
   }
@@ -77,12 +80,44 @@ export function validateUiSchemaReferences(schema: JsonSchema, uiSchema: unknown
 
   const ui = uiSchema as UiSchema;
   const referenced = new Set<string>();
-  if (Array.isArray(ui.order)) for (const field of ui.order) referenced.add(field);
+  const errors: ValidationError[] = [];
+
+  if (ui.order !== undefined) {
+    if (!Array.isArray(ui.order)) {
+      errors.push({
+        field: 'order',
+        keyword: 'uiSchema',
+        message: 'uiSchema.order must be an array of field names',
+      });
+    } else {
+      const ordered = new Set<string>();
+      ui.order.forEach((field, index) => {
+        if (typeof field !== 'string') {
+          errors.push({
+            field: `order.${index}`,
+            keyword: 'uiSchema',
+            message: `uiSchema.order[${index}] must be a string`,
+          });
+          return;
+        }
+        if (ordered.has(field)) {
+          errors.push({
+            field,
+            keyword: 'uiSchema',
+            message: `uiSchema.order contains duplicate property "${field}"`,
+          });
+          return;
+        }
+        ordered.add(field);
+        referenced.add(field);
+      });
+    }
+  }
+
   if (ui.fields && typeof ui.fields === 'object') {
     for (const field of Object.keys(ui.fields)) referenced.add(field);
   }
 
-  const errors: ValidationError[] = [];
   for (const field of referenced) {
     if (!known.has(field)) {
       errors.push({
@@ -164,14 +199,46 @@ export function validateSupportedFields(schema: JsonSchema): ValidationResult {
       });
     }
 
+    if (type === 'string') {
+      const minLength = prop.minLength;
+      const maxLength = prop.maxLength;
+      if (typeof minLength === 'number' && typeof maxLength === 'number' && minLength > maxLength) {
+        errors.push({
+          field: name,
+          keyword: 'minLength',
+          message: 'minLength must be less than or equal to maxLength',
+        });
+      }
+    }
+
+    if (type === 'number') {
+      const minimum = prop.minimum;
+      const maximum = prop.maximum;
+      if (typeof minimum === 'number' && typeof maximum === 'number' && minimum > maximum) {
+        errors.push({
+          field: name,
+          keyword: 'minimum',
+          message: 'minimum must be less than or equal to maximum',
+        });
+      }
+    }
+
     if (type === 'array') {
       const items = prop.items;
-      const itemsObj = items && typeof items === 'object' ? (items as Record<string, unknown>) : null;
+      const itemsObj =
+        items && typeof items === 'object' ? (items as Record<string, unknown>) : null;
       if (!itemsObj || itemsObj.type !== 'string' || !isStringArray(itemsObj.enum)) {
         errors.push({
           field: name,
           keyword: 'items',
           message: 'array fields must declare string items with an enum (multi-choice)',
+        });
+      }
+      if (prop.uniqueItems !== true) {
+        errors.push({
+          field: name,
+          keyword: 'uniqueItems',
+          message: 'array fields must set uniqueItems: true',
         });
       }
     }

@@ -108,4 +108,67 @@ describe('builder JSON mapping', () => {
     expect(result.value).toBeNull();
     expect(result.errors).toContain('fields[0].options[1].value must be unique.');
   });
+
+  it('normalizes submitted option values before duplicate checks', () => {
+    const result = parseBuilderJson(`{
+      "name": "",
+      "description": "",
+      "fields": [
+        {
+          "key": "status",
+          "label": "Status",
+          "type": "dropdown",
+          "required": true,
+          "options": [
+            { "label": "Active", "value": "active" },
+            { "label": "Enabled", "value": " active " }
+          ]
+        }
+      ]
+    }`);
+
+    expect(result.value).toBeNull();
+    expect(result.errors).toContain('fields[0].options[1].value must be unique.');
+  });
+
+  it('rejects invalid numeric constraint ranges', () => {
+    const result = parseBuilderJson(`{
+      "name": "",
+      "description": "",
+      "fields": [
+        {
+          "key": "ownershipPercent",
+          "label": "Ownership percent",
+          "type": "number",
+          "required": true,
+          "min": 100,
+          "max": 10
+        }
+      ]
+    }`);
+
+    expect(result.value).toBeNull();
+    expect(result.errors).toContain('fields[0].min must be less than or equal to fields[0].max.');
+  });
+
+  it('rejects negative and decimal text lengths', () => {
+    const result = parseBuilderJson(`{
+      "name": "",
+      "description": "",
+      "fields": [
+        {
+          "key": "name",
+          "label": "Name",
+          "type": "short-text",
+          "required": true,
+          "minLength": -1,
+          "maxLength": 2.5
+        }
+      ]
+    }`);
+
+    expect(result.value).toBeNull();
+    expect(result.errors).toContain('fields[0].minLength must be a non-negative integer.');
+    expect(result.errors).toContain('fields[0].maxLength must be a non-negative integer.');
+  });
 });

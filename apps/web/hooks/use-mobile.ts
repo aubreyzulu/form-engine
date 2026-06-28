@@ -8,15 +8,19 @@ function getIsMobile() {
 }
 
 export function useIsMobile() {
-  const [isMobile, setIsMobile] = React.useState(getIsMobile);
+  const [isMobile, setIsMobile] = React.useState(false);
 
   React.useEffect(() => {
     const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
     const onChange = () => {
       setIsMobile(getIsMobile());
     };
+    const updateAfterMount = window.setTimeout(onChange, 0);
     mql.addEventListener('change', onChange);
-    return () => mql.removeEventListener('change', onChange);
+    return () => {
+      window.clearTimeout(updateAfterMount);
+      mql.removeEventListener('change', onChange);
+    };
   }, []);
 
   return isMobile;

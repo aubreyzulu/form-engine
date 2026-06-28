@@ -22,12 +22,31 @@ export class CreateFormDto {
   @MaxLength(2000)
   description?: string;
 
-  @ApiPropertyOptional({ description: 'JSON Schema for the initial draft version.' })
+  @ApiPropertyOptional({
+    description: 'JSON Schema for the initial draft version.',
+    example: {
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      type: 'object',
+      additionalProperties: false,
+      required: ['fullName'],
+      properties: {
+        fullName: { type: 'string', minLength: 1, maxLength: 200 },
+      },
+    },
+  })
   @IsOptional()
   @IsObject()
   schema?: Record<string, unknown>;
 
-  @ApiPropertyOptional({ description: 'UI hints for the initial draft version.' })
+  @ApiPropertyOptional({
+    description: 'UI hints for the initial draft version.',
+    example: {
+      order: ['fullName'],
+      fields: {
+        fullName: { widget: 'text', label: 'Full legal name' },
+      },
+    },
+  })
   @IsOptional()
   @IsObject()
   uiSchema?: Record<string, unknown>;
@@ -35,26 +54,57 @@ export class CreateFormDto {
 
 export class CreateVersionDto {
   @ApiPropertyOptional({
-    description:
-      'JSON Schema (draft 2020-12) for the new draft. Omit to clone the latest version.',
+    description: 'JSON Schema (draft 2020-12) for the new draft. Omit to clone the latest version.',
+    example: {
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      type: 'object',
+      additionalProperties: false,
+      properties: {},
+    },
   })
   @IsOptional()
   @IsObject()
   schema?: Record<string, unknown>;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description: 'UI hints for the new draft. Omit with schema to clone the latest uiSchema.',
+    example: { order: [], fields: {} },
+  })
   @IsOptional()
   @IsObject()
   uiSchema?: Record<string, unknown>;
 }
 
 export class UpdateVersionDto {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description: 'Updated form display name stored with the form metadata.',
+    example: 'Beneficial Ownership Declaration',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  name?: string;
+
+  @ApiPropertyOptional({
+    description: 'Updated form description stored with the form metadata. Use null to clear it.',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  description?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Replacement JSON Schema for the draft version.',
+  })
   @IsOptional()
   @IsObject()
   schema?: Record<string, unknown>;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description: 'Replacement uiSchema for the draft version.',
+  })
   @IsOptional()
   @IsObject()
   uiSchema?: Record<string, unknown>;
