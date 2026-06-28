@@ -56,4 +56,24 @@ describe('FieldSettingsSheet', () => {
     expect(screen.getByText('Submitted values must be unique.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Apply changes' })).toBeDisabled();
   });
+
+  it('marks trimmed duplicate submitted values as invalid', async () => {
+    const user = userEvent.setup();
+
+    render(<FieldSettingsSheet field={dropdownField} onApply={vi.fn()} onClose={vi.fn()} />);
+
+    await user.clear(screen.getByLabelText('Option 2 submitted value'));
+    await user.type(screen.getByLabelText('Option 2 submitted value'), ' active ');
+
+    expect(screen.getByText('Submitted values must be unique.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Option 1 submitted value')).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
+    expect(screen.getByLabelText('Option 2 submitted value')).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Apply changes' })).toBeDisabled();
+  });
 });

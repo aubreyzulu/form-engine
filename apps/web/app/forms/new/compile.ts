@@ -148,9 +148,29 @@ export function parseConfig(text: string): { config: FormConfig | null; errors: 
       errors.push(error.field ? `${error.field}: ${error.message}` : error.message);
     }
   }
+  collectUiSchemaOrderErrors(uiSchema, errors);
 
   if (errors.length > 0) return { config: null, errors };
   return { config: { schema: schema as JsonSchema, uiSchema: uiSchema as UiSchema }, errors: [] };
+}
+
+function collectUiSchemaOrderErrors(uiSchema: unknown, errors: string[]) {
+  if (!uiSchema || typeof uiSchema !== 'object') return;
+  const order = (uiSchema as UiSchema).order;
+  if (!Array.isArray(order)) return;
+
+  const used = new Set<string>();
+  order.forEach((key, index) => {
+    if (typeof key !== 'string') {
+      errors.push(`uiSchema.order[${index}] must be a string.`);
+      return;
+    }
+    if (used.has(key)) {
+      errors.push(`uiSchema.order[${index}] duplicates "${key}".`);
+      return;
+    }
+    used.add(key);
+  });
 }
 
 function detectTypeId(prop: Record<string, unknown>, widget: FieldWidget | undefined): string {
@@ -184,13 +204,28 @@ function decompileOptions(
   prop: Record<string, unknown>,
   ui: BuilderUiFieldConfig,
 ): BuilderOption[] {
-  if (isBuilderOptions(ui['x-options'])) return ui['x-options'];
+  const schemaValues = schemaOptionValues(prop);
+
+  if (isBuilderOptions(ui['x-options'])) {
+    const values = ui['x-options'].map((option) => option.value);
+    const matchesSchema =
+      new Set(values).size === values.length &&
+      values.length === schemaValues.length &&
+      values.every((value, index) => value === schemaValues[index]);
+
+    if (matchesSchema) return ui['x-options'];
+  }
+
+  return schemaValues.map((value) => ({ label: value, value }));
+}
+
+function schemaOptionValues(prop: Record<string, unknown>): string[] {
   if (prop.type === 'array') {
     const items =
       prop.items && typeof prop.items === 'object' ? (prop.items as Record<string, unknown>) : {};
-    return isStringArray(items.enum) ? items.enum.map((value) => ({ label: value, value })) : [];
+    return isStringArray(items.enum) ? items.enum : [];
   }
-  return isStringArray(prop.enum) ? prop.enum.map((value) => ({ label: value, value })) : [];
+  return isStringArray(prop.enum) ? prop.enum : [];
 }
 
 /** Inverse of {@link compileForm}: rebuild editable builder state from a config. */
@@ -211,7 +246,7 @@ export function decompile(config: FormConfig): {
       : {};
   const order =
     Array.isArray(uiSchema.order) && uiSchema.order.length > 0
-      ? uiSchema.order
+      ? Array.from(new Set(uiSchema.order.filter((key): key is string => typeof key === 'string')))
       : Object.keys(properties);
 
   const fields: BuilderField[] = [];

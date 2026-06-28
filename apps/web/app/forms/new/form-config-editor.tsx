@@ -19,22 +19,44 @@ export function FormConfigEditor({
   onApply: (value: BuilderJsonApplyValue) => void;
 }) {
   const initialJson = useMemo(() => JSON.stringify(value, null, 2), [value]);
-  const [text, setText] = useState(initialJson);
-  const [copied, setCopied] = useState(false);
+  const [editor, setEditor] = useState({
+    sourceJson: initialJson,
+    text: initialJson,
+    copied: false,
+  });
+  const isSynced = editor.sourceJson === initialJson;
+  const text = isSynced ? editor.text : initialJson;
+  const copied = isSynced ? editor.copied : false;
 
   const result = useMemo(() => parseBuilderJson(text), [text]);
   const isValid = result.value !== null;
   const dirty = text !== initialJson;
+  const updateText = (nextText: string) =>
+    setEditor({ sourceJson: initialJson, text: nextText, copied: false });
 
   const copy = async () => {
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    try {
+      await navigator.clipboard.writeText(text);
+      setEditor((current) =>
+        current.sourceJson === initialJson ? { ...current, copied: true } : current,
+      );
+      setTimeout(
+        () =>
+          setEditor((current) =>
+            current.sourceJson === initialJson ? { ...current, copied: false } : current,
+          ),
+        1500,
+      );
+    } catch {
+      setEditor((current) =>
+        current.sourceJson === initialJson ? { ...current, copied: false } : current,
+      );
+    }
   };
 
   const format = () => {
     try {
-      setText(JSON.stringify(JSON.parse(text), null, 2));
+      updateText(JSON.stringify(JSON.parse(text), null, 2));
     } catch {
       // Leave invalid JSON untouched — the error list already explains why.
     }
@@ -67,7 +89,7 @@ export function FormConfigEditor({
       <textarea
         aria-label="Form builder JSON"
         className="min-h-[420px] w-full resize-y bg-transparent p-6 font-mono text-xs leading-relaxed outline-none"
-        onChange={(event) => setText(event.target.value)}
+        onChange={(event) => updateText(event.target.value)}
         spellCheck={false}
         value={text}
       />
@@ -83,7 +105,7 @@ export function FormConfigEditor({
       )}
 
       <div className="flex items-center justify-end gap-2 border-t px-6 py-3">
-        <Button disabled={!dirty} onClick={() => setText(initialJson)} variant="outline">
+        <Button disabled={!dirty} onClick={() => updateText(initialJson)} variant="outline">
           Reset
         </Button>
         <Button disabled={!isValid || !dirty} onClick={() => result.value && onApply(result.value)}>

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDown,
@@ -9,6 +10,7 @@ import {
   Copy,
   Eye,
   FileText,
+  LoaderCircle,
   Pencil,
   Plus,
   Table2,
@@ -37,6 +39,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import { type BuilderJsonApplyValue, toBuilderJson } from '@/app/forms/new/builder-json';
+import { compileForm } from '@/app/forms/new/compile';
 import { FieldSettingsSheet } from '@/app/forms/new/field-settings-sheet';
 import {
   type BuilderField,
@@ -49,16 +52,28 @@ import {
 import { FormConfigEditor } from '@/app/forms/new/form-config-editor';
 
 type BuilderTab = 'builder' | 'json';
+type SaveState =
+  | { status: 'idle' }
+  | { status: 'saving' | 'publishing' }
+  | { status: 'success'; message: string }
+  | { status: 'error'; message: string };
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v1';
 
 export function NewFormBuilderClient() {
+  const router = useRouter();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [fields, setFields] = useState<BuilderField[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [tab, setTab] = useState<BuilderTab>('builder');
+  const [saveState, setSaveState] = useState<SaveState>({ status: 'idle' });
 
   const editingField = fields.find((field) => field.id === editingId) ?? null;
-  const canPublish = name.trim() !== '' && fields.length > 0;
+  const isSubmitting = saveState.status === 'saving' || saveState.status === 'publishing';
+  const hasSaved = saveState.status === 'success';
+  const canSave = name.trim() !== '' && !isSubmitting && !hasSaved;
+  const canPublish = name.trim() !== '' && fields.length > 0 && !isSubmitting && !hasSaved;
   const builderJson = useMemo(
     () => toBuilderJson(name, description, fields),
     [name, description, fields],
@@ -113,6 +128,60 @@ export function NewFormBuilderClient() {
     setTab('builder');
   };
 
+  const saveForm = async (publish: boolean) => {
+    const trimmedName = name.trim();
+    if (!trimmedName || (publish && fields.length === 0)) return;
+
+    setSaveState({ status: publish ? 'publishing' : 'saving' });
+    const key = slugifyFormKey(trimmedName);
+    const config = compileForm(trimmedName, description, fields);
+
+    try {
+      const createResponse = await fetch(`${API_URL}/forms`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key,
+          name: trimmedName,
+          description: description.trim() || undefined,
+          schema: config.schema,
+          uiSchema: config.uiSchema,
+        }),
+      });
+
+      if (!createResponse.ok) {
+        throw new Error(await readApiError(createResponse, `Could not save "${trimmedName}".`));
+      }
+
+      if (publish) {
+        const publishResponse = await fetch(`${API_URL}/forms/${key}/versions/1/publish`, {
+          method: 'POST',
+        });
+        if (!publishResponse.ok) {
+          throw new Error(
+            await readApiError(
+              publishResponse,
+              `"${trimmedName}" was saved as a draft, but publishing failed.`,
+            ),
+          );
+        }
+      }
+
+      setSaveState({
+        status: 'success',
+        message: publish
+          ? `"${trimmedName}" was published.`
+          : `"${trimmedName}" was saved as a draft.`,
+      });
+      router.refresh();
+    } catch (error) {
+      setSaveState({
+        status: 'error',
+        message: error instanceof Error ? error.message : 'The form could not be saved.',
+      });
+    }
+  };
+
   return (
     <CreatorAppShell active="forms">
       <main className="flex min-h-screen flex-col gap-6 px-8 py-7">
@@ -156,10 +225,33 @@ export function NewFormBuilderClient() {
                 <Eye data-icon="inline-start" />
                 Live preview
               </Button>
-              <Button variant="outline">Save draft</Button>
-              <Button disabled={!canPublish}>Publish</Button>
+              <Button disabled={!canSave} onClick={() => saveForm(false)} variant="outline">
+                {saveState.status === 'saving' && <LoaderCircle className="animate-spin" />}
+                Save draft
+              </Button>
+              <Button disabled={!canPublish} onClick={() => saveForm(true)}>
+                {saveState.status === 'publishing' && <LoaderCircle className="animate-spin" />}
+                Publish
+              </Button>
             </div>
           </div>
+
+          {saveState.status === 'error' && (
+            <p
+              className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+              role="alert"
+            >
+              {saveState.message}
+            </p>
+          )}
+          {saveState.status === 'success' && (
+            <p
+              className="rounded-md border border-success/30 bg-success/5 px-3 py-2 text-sm text-success"
+              role="status"
+            >
+              {saveState.message}
+            </p>
+          )}
 
           <div className="flex justify-end">
             <AddFieldMenu onAdd={addField} />
@@ -295,11 +387,7 @@ export function NewFormBuilderClient() {
             </TabsContent>
 
             <TabsContent className="m-0" value="json">
-              <FormConfigEditor
-                key={JSON.stringify(builderJson)}
-                onApply={applyBuilderJson}
-                value={builderJson}
-              />
+              <FormConfigEditor onApply={applyBuilderJson} value={builderJson} />
             </TabsContent>
           </Tabs>
         </Card>
@@ -312,6 +400,28 @@ export function NewFormBuilderClient() {
       />
     </CreatorAppShell>
   );
+}
+
+function slugifyFormKey(value: string): string {
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .replace(/-{2,}/g, '-') || 'form'
+  );
+}
+
+async function readApiError(response: Response, fallback: string): Promise<string> {
+  try {
+    const body = (await response.json()) as { message?: unknown; error?: unknown };
+    if (typeof body.message === 'string') return body.message;
+    if (Array.isArray(body.message)) return body.message.join(' ');
+    if (typeof body.error === 'string') return body.error;
+  } catch {
+    // Fall through to the status-based message.
+  }
+  return `${fallback} (${response.status})`;
 }
 
 function FieldRowAction({
