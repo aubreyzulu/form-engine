@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-app}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
-      POSTGRES_DB: ${POSTGRES_DB:-forms}
+      POSTGRES_DB: ${POSTGRES_DB:-form-engine}
     ports:
       - '${POSTGRES_PORT:-5432}:5432'
     healthcheck:
