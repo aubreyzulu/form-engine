@@ -144,6 +144,35 @@ describe('decompile', () => {
     ]);
   });
 
+  it('keeps option labels when uiSchema metadata has the same values in a different order', () => {
+    const config = {
+      schema: {
+        type: 'object',
+        properties: {
+          status: { type: 'string', enum: ['active', 'inactive'] },
+        },
+      },
+      uiSchema: {
+        order: ['status'],
+        fields: {
+          status: {
+            widget: 'select',
+            label: 'Status',
+            'x-options': [
+              { label: 'Inactive company', value: 'inactive' },
+              { label: 'Active company', value: 'active' },
+            ],
+          },
+        },
+      },
+    } as unknown as FormConfig;
+
+    expect(decompile(config).fields[0]?.options).toEqual([
+      { label: 'Inactive company', value: 'inactive' },
+      { label: 'Active company', value: 'active' },
+    ]);
+  });
+
   it('de-duplicates repeated uiSchema order entries while rebuilding fields', () => {
     const config: FormConfig = {
       schema: {
@@ -182,6 +211,7 @@ describe('parseConfig', () => {
     }`);
 
     expect(result.config).toBeNull();
-    expect(result.errors).toContain('uiSchema.order[1] duplicates "status".');
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]).toContain('duplicate property "status"');
   });
 });

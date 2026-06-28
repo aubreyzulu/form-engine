@@ -57,8 +57,10 @@ type SaveState =
   | { status: 'saving' | 'publishing' }
   | { status: 'success'; message: string }
   | { status: 'error'; message: string };
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v1';
+type DraftIdentity = {
+  key: string;
+  version: number;
+};
 
 export function NewFormBuilderClient() {
   const router = useRouter();
@@ -68,12 +70,28 @@ export function NewFormBuilderClient() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [tab, setTab] = useState<BuilderTab>('builder');
   const [saveState, setSaveState] = useState<SaveState>({ status: 'idle' });
+  const [draftIdentity, setDraftIdentity] = useState<DraftIdentity | null>(null);
+  const [savedSignature, setSavedSignature] = useState<string | null>(null);
+  const [publishedSignature, setPublishedSignature] = useState<string | null>(null);
 
   const editingField = fields.find((field) => field.id === editingId) ?? null;
   const isSubmitting = saveState.status === 'saving' || saveState.status === 'publishing';
-  const hasSaved = saveState.status === 'success';
-  const canSave = name.trim() !== '' && !isSubmitting && !hasSaved;
-  const canPublish = name.trim() !== '' && fields.length > 0 && !isSubmitting && !hasSaved;
+  const formSignature = useMemo(
+    () => JSON.stringify({ name: name.trim(), description: description.trim(), fields }),
+    [name, description, fields],
+  );
+  const canSave = name.trim() !== '' && !isSubmitting && savedSignature !== formSignature;
+  const canPublish =
+    name.trim() !== '' &&
+    fields.length > 0 &&
+    !isSubmitting &&
+    publishedSignature !== formSignature;
+  const visibleSaveState: SaveState =
+    saveState.status === 'success' &&
+    savedSignature !== formSignature &&
+    publishedSignature !== formSignature
+      ? { status: 'idle' }
+      : saveState;
   const builderJson = useMemo(
     () => toBuilderJson(name, description, fields),
     [name, description, fields],
@@ -133,30 +151,63 @@ export function NewFormBuilderClient() {
     if (!trimmedName || (publish && fields.length === 0)) return;
 
     setSaveState({ status: publish ? 'publishing' : 'saving' });
-    const key = slugifyFormKey(trimmedName);
     const config = compileForm(trimmedName, description, fields);
+    const signature = formSignature;
 
     try {
-      const createResponse = await fetch(`${API_URL}/forms`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          key,
-          name: trimmedName,
-          description: description.trim() || undefined,
-          schema: config.schema,
-          uiSchema: config.uiSchema,
-        }),
-      });
+      const apiUrl = getApiUrl();
+      let draft = draftIdentity;
 
-      if (!createResponse.ok) {
-        throw new Error(await readApiError(createResponse, `Could not save "${trimmedName}".`));
+      if (draft) {
+        if (savedSignature !== signature) {
+          const updateResponse = await fetch(
+            `${apiUrl}/forms/${draft.key}/versions/${draft.version}`,
+            {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                schema: config.schema,
+                uiSchema: config.uiSchema,
+              }),
+            },
+          );
+
+          if (!updateResponse.ok) {
+            throw new Error(
+              await readApiError(updateResponse, `Could not update "${trimmedName}".`),
+            );
+          }
+        }
+      } else {
+        const key = createFormKey(trimmedName);
+        const createResponse = await fetch(`${apiUrl}/forms`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            key,
+            name: trimmedName,
+            description: description.trim() || undefined,
+            schema: config.schema,
+            uiSchema: config.uiSchema,
+          }),
+        });
+
+        if (!createResponse.ok) {
+          throw new Error(await readApiError(createResponse, `Could not save "${trimmedName}".`));
+        }
+
+        draft = await readCreatedDraft(createResponse, key);
+        setDraftIdentity(draft);
       }
+      setSavedSignature(signature);
 
       if (publish) {
-        const publishResponse = await fetch(`${API_URL}/forms/${key}/versions/1/publish`, {
-          method: 'POST',
-        });
+        const publishResponse = await fetch(
+          `${apiUrl}/forms/${draft.key}/versions/${draft.version}/publish`,
+          {
+            method: 'POST',
+          },
+        );
         if (!publishResponse.ok) {
           throw new Error(
             await readApiError(
@@ -165,6 +216,7 @@ export function NewFormBuilderClient() {
             ),
           );
         }
+        setPublishedSignature(signature);
       }
 
       setSaveState({
@@ -174,6 +226,7 @@ export function NewFormBuilderClient() {
           : `"${trimmedName}" was saved as a draft.`,
       });
       router.refresh();
+      if (publish) router.push('/forms');
     } catch (error) {
       setSaveState({
         status: 'error',
@@ -236,20 +289,20 @@ export function NewFormBuilderClient() {
             </div>
           </div>
 
-          {saveState.status === 'error' && (
+          {visibleSaveState.status === 'error' && (
             <p
               className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
               role="alert"
             >
-              {saveState.message}
+              {visibleSaveState.message}
             </p>
           )}
-          {saveState.status === 'success' && (
+          {visibleSaveState.status === 'success' && (
             <p
               className="rounded-md border border-success/30 bg-success/5 px-3 py-2 text-sm text-success"
               role="status"
             >
-              {saveState.message}
+              {visibleSaveState.message}
             </p>
           )}
 
@@ -402,6 +455,16 @@ export function NewFormBuilderClient() {
   );
 }
 
+function getApiUrl(): string {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (!apiUrl) throw new Error('NEXT_PUBLIC_API_URL is not configured.');
+  return apiUrl.replace(/\/+$/, '');
+}
+
+function createFormKey(value: string): string {
+  return `${slugifyFormKey(value)}-${crypto.randomUUID().slice(0, 8)}`;
+}
+
 function slugifyFormKey(value: string): string {
   return (
     value
@@ -410,6 +473,19 @@ function slugifyFormKey(value: string): string {
       .replace(/^-+|-+$/g, '')
       .replace(/-{2,}/g, '-') || 'form'
   );
+}
+
+async function readCreatedDraft(response: Response, fallbackKey: string): Promise<DraftIdentity> {
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    body = null;
+  }
+  const record = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
+  const key = typeof record.key === 'string' ? record.key : fallbackKey;
+  const version = typeof record.version === 'number' ? record.version : 1;
+  return { key, version };
 }
 
 async function readApiError(response: Response, fallback: string): Promise<string> {

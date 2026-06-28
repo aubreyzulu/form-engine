@@ -35,21 +35,29 @@ export function FormConfigEditor({
     setEditor({ sourceJson: initialJson, text: nextText, copied: false });
 
   const copy = async () => {
+    const copiedText = text;
+    const copiedSource = initialJson;
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(copiedText);
       setEditor((current) =>
-        current.sourceJson === initialJson ? { ...current, copied: true } : current,
+        current.sourceJson === copiedSource && current.text === copiedText
+          ? { ...current, copied: true }
+          : current,
       );
       setTimeout(
         () =>
           setEditor((current) =>
-            current.sourceJson === initialJson ? { ...current, copied: false } : current,
+            current.sourceJson === copiedSource && current.text === copiedText
+              ? { ...current, copied: false }
+              : current,
           ),
         1500,
       );
     } catch {
       setEditor((current) =>
-        current.sourceJson === initialJson ? { ...current, copied: false } : current,
+        current.sourceJson === copiedSource && current.text === copiedText
+          ? { ...current, copied: false }
+          : current,
       );
     }
   };

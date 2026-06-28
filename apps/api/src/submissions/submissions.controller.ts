@@ -19,6 +19,7 @@ export class SubmissionsController {
   @ApiParam({ name: 'key', description: 'Stable form slug.', example: 'bo-declaration' })
   @ApiBody({ type: CreateSubmissionDto })
   @ApiResponse({ status: 201, description: 'Submission accepted and version-pinned.' })
+  @ApiResponse({ status: 400, description: 'Request shape failed DTO validation.' })
   @ApiResponse({ status: 404, description: 'FORM_NOT_FOUND or NO_PUBLISHED_VERSION.' })
   @ApiResponse({ status: 422, description: 'SUBMISSION_VALIDATION_FAILED.' })
   create(@Param('key') key: string, @Body() dto: CreateSubmissionDto) {

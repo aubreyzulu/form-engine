@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -118,5 +118,30 @@ describe('FormConfigEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Copy' }));
 
     expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument();
+  });
+
+  it('does not show copied feedback after the copied text changes mid-write', async () => {
+    const user = userEvent.setup();
+    let editor: HTMLTextAreaElement | null = null;
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: vi.fn().mockImplementation(async () => {
+          if (!editor) throw new Error('editor was not rendered');
+          fireEvent.change(editor, {
+            target: {
+              value: JSON.stringify({ name: 'Changed', description: '', fields: [] }, null, 2),
+            },
+          });
+        }),
+      },
+    });
+
+    render(<FormConfigEditor onApply={vi.fn()} value={baseValue} />);
+    editor = screen.getByLabelText('Form builder JSON') as HTMLTextAreaElement;
+
+    await user.click(screen.getByRole('button', { name: 'Copy' }));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument());
   });
 });

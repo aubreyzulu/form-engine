@@ -117,6 +117,7 @@ export class FormsController {
   @ApiParam({ name: 'key', description: 'Stable form slug.', example: 'bo-declaration' })
   @ApiParam({ name: 'version', description: 'Integer version number.', example: 1 })
   @ApiResponse({ status: 200, description: 'Version returned.' })
+  @ApiResponse({ status: 400, description: 'Invalid version parameter.' })
   @ApiResponse({ status: 404, description: 'FORM_NOT_FOUND or VERSION_NOT_FOUND.' })
   getVersion(@Param('key') key: string, @Param('version', ParseIntPipe) version: number) {
     return this.forms.getVersion(key, version);
@@ -132,6 +133,7 @@ export class FormsController {
   @ApiParam({ name: 'key', description: 'Stable form slug.', example: 'bo-declaration' })
   @ApiBody({ type: CreateVersionDto })
   @ApiResponse({ status: 201, description: 'Draft version created.' })
+  @ApiResponse({ status: 400, description: 'Request shape failed DTO validation.' })
   @ApiResponse({ status: 404, description: 'FORM_NOT_FOUND or VERSION_NOT_FOUND.' })
   @ApiResponse({
     status: 422,
@@ -150,6 +152,7 @@ export class FormsController {
   @ApiParam({ name: 'version', description: 'Integer version number.', example: 1 })
   @ApiBody({ type: UpdateVersionDto })
   @ApiResponse({ status: 200, description: 'Draft version updated.' })
+  @ApiResponse({ status: 400, description: 'Invalid version parameter or request body.' })
   @ApiResponse({ status: 404, description: 'FORM_NOT_FOUND or VERSION_NOT_FOUND.' })
   @ApiResponse({ status: 409, description: 'VERSION_NOT_EDITABLE.' })
   @ApiResponse({
@@ -174,6 +177,7 @@ export class FormsController {
   @ApiParam({ name: 'key', description: 'Stable form slug.', example: 'bo-declaration' })
   @ApiParam({ name: 'version', description: 'Integer version number.', example: 1 })
   @ApiResponse({ status: 200, description: 'Version published.' })
+  @ApiResponse({ status: 400, description: 'Invalid version parameter.' })
   @ApiResponse({ status: 404, description: 'FORM_NOT_FOUND or VERSION_NOT_FOUND.' })
   @ApiResponse({ status: 409, description: 'VERSION_NOT_EDITABLE.' })
   @ApiResponse({

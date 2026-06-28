@@ -34,18 +34,18 @@ should not claim it until `apps/api/Dockerfile`, `apps/web/Dockerfile`, and app
 services in `docker-compose.yml` exist.
 
 The migration directory is intentionally created by Prisma, not hand-written. To
-create the initial migration after replacing `DATABASE_URL`, run
+create the initial migration with the local compose database, run
 `npx prisma migrate dev` from `apps/api`.
 
 ## Env vars
 
-| Var                                                                  | Used by       | Example                                              |
-| -------------------------------------------------------------------- | ------------- | ---------------------------------------------------- |
-| `DATABASE_URL`                                                       | api (Prisma)  | `postgresql://aubreyzulu@localhost:5432/form-engine` |
-| `NEXT_PUBLIC_API_URL`                                                | web           | `http://localhost:4000/api/v1`                       |
-| `PORT`                                                               | api           | `4000`                                               |
-| `CORS_ORIGINS`                                                       | api           | `http://localhost:3000`                              |
-| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT` | local compose | `app`, `app`, `form-engine`, `5432`                  |
+| Var                                                                  | Used by       | Example                                           |
+| -------------------------------------------------------------------- | ------------- | ------------------------------------------------- |
+| `DATABASE_URL`                                                       | api (Prisma)  | `postgresql://app:app@localhost:5432/form-engine` |
+| `NEXT_PUBLIC_API_URL`                                                | web           | `http://localhost:4000/api/v1`                    |
+| `PORT`                                                               | api           | `4000`                                            |
+| `CORS_ORIGINS`                                                       | api           | `http://localhost:3000`                           |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT` | local compose | `app`, `app`, `form-engine`, `5432`               |
 
 `.env.example` files committed; real `.env` git-ignored.
 
@@ -65,7 +65,9 @@ reviewer to "use it without setting it up locally."
 
 ### Deploy outline
 
-- Push repo → Railway builds each service from its Dockerfile.
+- Push repo → Railway builds each app with configured build/start commands
+  (for example, Nixpacks). Add `apps/api/Dockerfile` and `apps/web/Dockerfile`
+  first if choosing Dockerfile-based Railway services.
 - Set service env vars (DB URL injected by the plugin; `NEXT_PUBLIC_API_URL` set to
   the api domain).
 - Migrations/seed run on release.

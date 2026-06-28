@@ -29,11 +29,10 @@ cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env.local
 ```
 
-Update `DATABASE_URL` in `apps/api/.env` before running migrations. The local
-example is:
+The local `DATABASE_URL` example matches the bundled Docker Postgres defaults:
 
 ```bash
-DATABASE_URL="postgresql://aubreyzulu@localhost:5432/form-engine"
+DATABASE_URL="postgresql://app:app@localhost:5432/form-engine"
 ```
 
 `NEXT_PUBLIC_API_URL` should point at the API version prefix:
