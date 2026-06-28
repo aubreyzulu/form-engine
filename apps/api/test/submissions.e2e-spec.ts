@@ -51,7 +51,11 @@ describe('Submissions (e2e)', () => {
   });
 
   afterAll(async () => {
-    // Cascade delete removes versions + submissions.
+    // Submissions intentionally restrict version deletion in production, so tests
+    // clean their response rows before deleting the generated form + versions.
+    await prisma.submission.deleteMany({
+      where: { formVersion: { form: { key } } },
+    });
     await prisma.form.deleteMany({ where: { key } });
     await app.close();
   });
