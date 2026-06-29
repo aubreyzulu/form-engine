@@ -111,7 +111,7 @@ export function isOptionListType(typeId: string): boolean {
   return typeId === 'dropdown' || typeId === 'checkboxes';
 }
 
-export function defaultOptions(): BuilderOption[] {
+function defaultOptions(): BuilderOption[] {
   return [
     { label: 'Option 1', value: 'option1' },
     { label: 'Option 2', value: 'option2' },

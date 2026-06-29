@@ -189,4 +189,41 @@
     font-family: var(--font-sans);
     letter-spacing: var(--tracking-normal);
   }
+
+  :where(
+    [data-slot='input'],
+    [data-slot='textarea'],
+    [data-slot='select-trigger'],
+    [data-slot='native-select'],
+    [data-slot='checkbox'],
+    [data-slot='radio-group-item'],
+    [data-slot='switch'],
+    [data-slot='combobox-chips'],
+    [data-slot='input-group'],
+    [data-slot='input-otp-slot']
+  ):is(:focus-visible, :focus-within, [data-active='true']) {
+    border-width: 2px !important;
+    box-shadow: none !important;
+  }
+
+  :where(
+    [data-slot='input'],
+    [data-slot='textarea'],
+    [data-slot='select-trigger'],
+    [data-slot='native-select'],
+    [data-slot='checkbox'],
+    [data-slot='radio-group-item'],
+    [data-slot='switch'],
+    [data-slot='combobox-chips'],
+    [data-slot='input-group'],
+    [data-slot='input-otp-slot']
+  )[aria-invalid='true'],
+  :where(
+    [data-slot='input-group'],
+    [data-slot='combobox-chips'],
+    [data-slot='input-otp-group']
+  ):has([aria-invalid='true']) {
+    border-width: 2px !important;
+    box-shadow: none !important;
+  }
 }
