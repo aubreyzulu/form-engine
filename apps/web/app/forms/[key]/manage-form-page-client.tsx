@@ -15,22 +15,13 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
-import { formatSubmittedValue } from '@/app/f/[key]/fill-form-utils';
+import { SubmissionResponseViewer } from '@/app/forms/[key]/submission-response-viewer';
 import { CreatorAppShell } from '@/components/creator-app-shell';
 import { FormStatusBadge } from '@/components/form-status-badge';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   createDraftVersion,
   getManageForm,
@@ -270,115 +261,13 @@ function ManageFormContent({
         />
       </section>
 
-      <Card className="rounded">
-        <CardHeader className="border-b">
-          <CardTitle className="text-xl">Latest configuration</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {fields.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="h-11 px-6">Label</TableHead>
-                  <TableHead>Key</TableHead>
-                  <TableHead>Widget</TableHead>
-                  <TableHead>Required</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {fields.map((field) => (
-                  <TableRow key={field.key}>
-                    <TableCell className="px-6 font-medium">{field.label}</TableCell>
-                    <TableCell className="font-mono text-sm text-muted-foreground">
-                      {field.key}
-                    </TableCell>
-                    <TableCell>{field.widget}</TableCell>
-                    <TableCell>
-                      {field.required ? (
-                        <Badge className="bg-success/15 text-success">Required</Badge>
-                      ) : (
-                        <span className="text-muted-foreground">Optional</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="px-6 py-10 text-muted-foreground">
-              This draft does not have fields yet.
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <SubmissionsCard
+      <SubmissionResponseViewer
         error={submissionsError}
+        fields={fields}
         loading={submissionsLoading}
         submissions={submissions}
       />
     </>
-  );
-}
-
-function SubmissionsCard({
-  error,
-  loading,
-  submissions,
-}: {
-  error: Error | null;
-  loading: boolean;
-  submissions?: SubmissionListResponse;
-}) {
-  const items = submissions?.items ?? [];
-  return (
-    <Card className="rounded">
-      <CardHeader className="border-b">
-        <CardTitle className="text-xl">Recent submissions</CardTitle>
-        <CardDescription>Newest responses across all published versions.</CardDescription>
-      </CardHeader>
-      <CardContent className="p-0">
-        {loading ? (
-          <output className="block space-y-3 p-6" aria-label="Loading submissions">
-            <Skeleton className="h-5 w-full" />
-            <Skeleton className="h-5 w-5/6" />
-            <Skeleton className="h-5 w-2/3" />
-          </output>
-        ) : error ? (
-          <Alert className="m-6" variant="destructive">
-            <AlertTitle>Submissions could not be loaded</AlertTitle>
-            <AlertDescription>{error.message}</AlertDescription>
-          </Alert>
-        ) : items.length > 0 ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="h-11 px-6">Submitted</TableHead>
-                <TableHead>Version</TableHead>
-                <TableHead>Response preview</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((submission) => (
-                <TableRow key={submission.id}>
-                  <TableCell className="px-6 font-medium">
-                    {formatDateDistance(submission.createdAt)}
-                  </TableCell>
-                  <TableCell>v{submission.formVersion?.version ?? '-'}</TableCell>
-                  <TableCell className="max-w-[42rem] text-muted-foreground">
-                    {formatSubmissionPreview(submission.data)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        ) : (
-          <div className="px-6 py-10 text-muted-foreground">
-            No responses have been submitted yet.
-          </div>
-        )}
-      </CardContent>
-    </Card>
   );
 }
 
@@ -452,13 +341,4 @@ function formatDateDistance(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '-';
   return formatDistanceToNow(date, { addSuffix: true });
-}
-
-function formatSubmissionPreview(data: unknown) {
-  if (!data || typeof data !== 'object' || Array.isArray(data)) return 'No response data';
-  const entries = Object.entries(data).slice(0, 3);
-  if (entries.length === 0) return 'No response data';
-  const preview = entries.map(([key, value]) => `${key}: ${formatSubmittedValue(value)}`);
-  const remaining = Object.keys(data).length - entries.length;
-  return remaining > 0 ? `${preview.join(' | ')} | +${remaining} more` : preview.join(' | ');
 }

@@ -53,7 +53,9 @@ submissionsKeys.byForm = (key: string) => ['submissions', 'form', key];
 - [x] Run the full local frontend/backend flow with API + web servers:
       create draft, publish, render dashboard/manage/fill routes, submit response,
       and verify submission counts update.
-- [ ] Run the full frontend/backend flow after Railway migrations are applied.
+- [x] Run the full frontend/backend flow after Railway migrations are applied.
+      Verified Railway API/web/Postgres deployments on merge commit `7ea92d7`,
+      hosted API health, hosted Swagger, hosted web routes, and seeded form reads.
 
 ## Acceptance Criteria
 

@@ -27,7 +27,7 @@ docs/
   adr/              Architecture decision records
   mockups/          Concept mockups generated with Codex Image Gen 2
   *.md              Assignment brief, API spec, testing notes, user journeys, TODOs
-docker-compose.yml  Local PostgreSQL service for development
+docker-compose.yml  Full local stack: PostgreSQL, API, and web app
 turbo.json          Turborepo task graph
 pnpm-workspace.yaml pnpm workspace package map
 ```
@@ -52,8 +52,7 @@ frontend conditionals.
 
 - Node.js 20+
 - pnpm 10.x
-- Docker Desktop or another Docker runtime if using the provided local Postgres
-  service
+- Docker Desktop or another Docker runtime if using the full local Compose stack
 - PostgreSQL if you are not using Docker Compose
 
 Enable pnpm through Corepack if needed:
@@ -76,7 +75,7 @@ cp apps/web/.env.example apps/web/.env.local
 The local database URL used by the examples is:
 
 ```bash
-DATABASE_URL="postgresql://app:app@localhost:5432/form-engine"
+DATABASE_URL="postgresql://app@localhost:5432/form-engine"
 ```
 
 The web app calls the versioned API prefix:
@@ -87,35 +86,46 @@ NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1
 
 ## Docker Compose
 
-The current `docker-compose.yml` provides the PostgreSQL service expected by the
-local assessment workflow:
+The fastest reviewer path is the full local stack:
 
 ```bash
-docker compose up -d postgres
+cp .env.example .env
+docker compose up --build
 docker compose ps
 ```
 
-Defaults come from `.env.example`:
+This starts:
+
+- PostgreSQL 16 on `localhost:5432`
+- NestJS API on `http://localhost:4000`
+- Next.js web app on `http://localhost:3000`
+
+The API service waits for Postgres, runs `prisma migrate deploy`, runs the
+idempotent production seed, then starts Nest. The web service waits for the API
+healthcheck.
+
+Compose defaults come from `.env.example`:
 
 ```bash
 POSTGRES_USER=app
-POSTGRES_PASSWORD=app
 POSTGRES_DB=form-engine
 POSTGRES_PORT=5432
+POSTGRES_HOST_AUTH_METHOD=trust
+DATABASE_URL="postgresql://app@postgres:5432/form-engine"
+NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1
 ```
 
 To reset the local database volume:
 
 ```bash
 docker compose down -v
-docker compose up -d postgres
+cp .env.example .env
+docker compose up --build
 ```
 
-Full API/web Docker services are not part of the current Compose file yet. Until
-those Dockerfiles are added, run the API and web app with pnpm as described
-below.
+## Run Locally With pnpm
 
-## Run Locally
+Use this path when developing without rebuilding containers.
 
 Install dependencies from the repository root:
 
@@ -128,6 +138,10 @@ Start Postgres:
 ```bash
 docker compose up -d postgres
 ```
+
+For host-run API commands, use `apps/api/.env` with
+`DATABASE_URL="postgresql://app@localhost:5432/form-engine"`. The root `.env`
+uses the Compose service hostname (`postgres`) for containers.
 
 Generate Prisma Client and run migrations:
 
@@ -155,6 +169,19 @@ Local URLs:
 - API base: `http://localhost:4000/api/v1`
 - Swagger docs: `http://localhost:4000/api/docs`
 - Health check: `http://localhost:4000/api/v1/health`
+
+## Hosted Deployment
+
+The Railway deployment is public and does not require credentials:
+
+- Web app: `https://form-engine.aubreyzulu.com`
+- API base: `https://form-engine-api.up.railway.app/api/v1`
+- Swagger docs: `https://form-engine-api.up.railway.app/api/docs`
+- Health check: `https://form-engine-api.up.railway.app/api/v1/health`
+
+Railway deploys the API from `main` with `pnpm start:api`. That command runs
+`pnpm railway:api:release` before starting Nest, so checked-in migrations and the
+idempotent seed are applied against the hosted PostgreSQL database on startup.
 
 ## Turborepo Commands
 
@@ -206,7 +233,9 @@ app has realistic review data before the API starts.
 - Frontend data fetching uses TanStack Query with centralized query keys.
 - Concept mockups in `docs/mockups/` were generated with Codex Image Gen 2.
 
-## Current Gaps
+## With More Time
 
-Notable remaining items include full-stack Docker services and ongoing
-documentation refresh as implementation details change.
+- Authentication, roles, and multi-tenant ownership boundaries.
+- Conditional/branching fields and localisation support.
+- Richer response analytics and export workflows.
+- Smaller production Docker images using pruned workspace installs.

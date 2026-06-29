@@ -122,17 +122,73 @@ const draftWithLiveVersionResponse = {
   publishedVersion: 1,
 };
 
+const versionOneSchema = {
+  type: 'object',
+  properties: {
+    fullName: { type: 'string' },
+    country: { type: 'string', enum: ['GB', 'ZM'] },
+    acceptedTerms: { type: 'boolean' },
+  },
+  required: ['fullName', 'acceptedTerms'],
+  additionalProperties: false,
+};
+
+const versionOneUiSchema = {
+  order: ['fullName', 'country', 'acceptedTerms'],
+  fields: {
+    fullName: { widget: 'text', label: 'Full legal name' },
+    country: { widget: 'select', label: 'Country' },
+    acceptedTerms: { widget: 'checkbox', label: 'Terms accepted' },
+  },
+};
+
+const versionTwoSchema = {
+  type: 'object',
+  properties: {
+    fullName: { type: 'string' },
+    country: { type: 'string', enum: ['GB', 'US', 'ZM'] },
+    reviewNote: { type: 'string' },
+  },
+  required: ['fullName', 'country'],
+  additionalProperties: false,
+};
+
+const versionTwoUiSchema = {
+  order: ['fullName', 'country', 'reviewNote'],
+  fields: {
+    fullName: { widget: 'text', label: 'Applicant legal name' },
+    country: { widget: 'select', label: 'Registration country' },
+    reviewNote: { widget: 'textarea', label: 'Reviewer note' },
+  },
+};
+
 const submissionsResponse = {
   items: [
     {
       id: 'submission-1',
       formVersionId: 'version-1',
-      formVersion: { version: 1 },
+      formVersion: { version: 1, schema: versionOneSchema, uiSchema: versionOneUiSchema },
       data: { fullName: 'Ada Lovelace', country: 'GB', acceptedTerms: true },
       createdAt: '2026-06-28T12:00:00.000Z',
     },
   ],
   total: 1,
+  skip: 0,
+  take: 50,
+};
+
+const multipleSubmissionsResponse = {
+  items: [
+    submissionsResponse.items[0],
+    {
+      id: 'submission-2',
+      formVersionId: 'version-2',
+      formVersion: { version: 2, schema: versionTwoSchema, uiSchema: versionTwoUiSchema },
+      data: { fullName: 'Grace Hopper', country: 'US', reviewNote: 'Needs follow-up' },
+      createdAt: '2026-06-28T13:00:00.000Z',
+    },
+  ],
+  total: 2,
   skip: 0,
   take: 50,
 };
@@ -186,18 +242,50 @@ describe('ManageFormPageClient', () => {
     expect(screen.getByText('Draft')).toBeInTheDocument();
     expect(screen.getByText('v2')).toBeInTheDocument();
     expect(screen.getByText('12')).toBeInTheDocument();
-    expect(screen.getByRole('cell', { name: 'Country' })).toBeInTheDocument();
-    expect(screen.getByRole('cell', { name: 'country' })).toBeInTheDocument();
-    expect(screen.getByRole('cell', { name: 'select' })).toBeInTheDocument();
-    expect(screen.getByRole('cell', { name: 'Full legal name' })).toBeInTheDocument();
-    expect(screen.getAllByText('Required')).toHaveLength(2);
-    expect(screen.getByText(/fullName: Ada Lovelace/)).toBeInTheDocument();
-    expect(screen.getByText(/acceptedTerms: Yes/)).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getByText('1 required')).toBeInTheDocument();
+    expect(screen.queryByText('Latest configuration')).not.toBeInTheDocument();
+    expect(screen.queryByRole('cell', { name: 'Country' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('cell', { name: 'country' })).not.toBeInTheDocument();
+    expect(screen.getAllByText(/fullName: Ada Lovelace/)).toHaveLength(2);
+    expect(screen.getAllByText(/acceptedTerms: Yes/)).toHaveLength(2);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Response detail' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Form version v1')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'No live form' })).toBeDisabled();
+    expect(screen.queryByRole('link', { name: 'Responses' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Compliance Officer')).not.toBeInTheDocument();
+    expect(screen.queryByText('Collapse')).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       'http://localhost:4000/api/v1/forms/ownership-declaration/manage',
       expect.any(Object),
     );
+  });
+
+  it('opens a selected response detail from the submissions table', async () => {
+    const user = userEvent.setup();
+    mockFetchRoutes({
+      '/forms/ownership-declaration/manage': [okResponse(draftManageResponse)],
+      '/forms/ownership-declaration/submissions': [okResponse(multipleSubmissionsResponse)],
+    });
+
+    renderWithQueryClient();
+
+    expect(await screen.findAllByText(/fullName: Ada Lovelace/)).toHaveLength(2);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    const viewButtons = screen.getAllByRole('button', { name: 'View' });
+    await user.click(viewButtons[1]!);
+
+    const detail = await screen.findByRole('dialog');
+    expect(detail).toHaveTextContent('Response detail');
+    expect(detail).toHaveTextContent('Grace Hopper');
+    expect(detail).toHaveTextContent('Applicant legal name');
+    expect(detail).toHaveTextContent('Registration country');
+    expect(detail).toHaveTextContent('Reviewer note');
+    expect(detail).toHaveTextContent('Form version v2');
+    expect(screen.getByText('Needs follow-up')).toBeInTheDocument();
   });
 
   it('shows an error state and retries both authoring queries', async () => {
