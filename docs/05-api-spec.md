@@ -133,5 +133,5 @@ review surface, not a best-effort extra.
 
 ## Health
 
-`GET /health` returns `{ status: "ok" }` (and DB connectivity) for Railway
+`GET /api/v1/health` returns `{ status: "ok" }` (and DB connectivity) for Railway
 healthchecks and docker-compose `depends_on` gating.

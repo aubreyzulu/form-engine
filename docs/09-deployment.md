@@ -54,8 +54,10 @@ create the initial migration with the local compose database, run
 One Railway project, three components:
 
 1. **Postgres** — Railway managed plugin; provides `DATABASE_URL`.
-2. **api** — NestJS service. Release step should run `prisma migrate deploy` (+ seed
-   once). Exposes the API; healthcheck on `/health`.
+2. **api** — NestJS service. Railway starts the service with `pnpm start:api`,
+   which runs `pnpm railway:api:release` before `node dist/src/main.js`. That
+   applies Prisma migrations and idempotently seeds realistic review data before
+   the API starts. Exposes the API; healthcheck on `/api/v1/health`.
 3. **web** — Next.js service. `NEXT_PUBLIC_API_URL` points at the api service's
    public domain.
 
@@ -70,7 +72,9 @@ reviewer to "use it without setting it up locally."
   first if choosing Dockerfile-based Railway services.
 - Set service env vars (DB URL injected by the plugin; `NEXT_PUBLIC_API_URL` set to
   the api domain).
-- Migrations/seed run on release.
+- API service start command: `pnpm start:api`. This runs
+  `pnpm railway:api:release` (`prisma migrate deploy` + `db:seed:prod`) before
+  starting the production Nest server.
 - Capture the two public URLs (+ note that no credentials are needed — Assignment A
   has no auth) in the top-level README.
 
