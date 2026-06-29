@@ -4,15 +4,17 @@ Two surfaces: **Authoring** (the Creator builds/manages forms) and **Fill** (the
 Submitter renders + submits a published form). Read the root `CLAUDE.md` first; the
 journeys are in `docs/11-user-journeys.md`, the design in `docs/06-frontend.md`.
 
-> Status: scaffolded (Next.js 16 App Router, React 19, Tailwind v4, strict TS).
-> Routes/builder/renderer still to build. See `AGENTS.md` — Next 16 has breaking
-> changes vs older conventions; consult `node_modules/next/dist/docs/` when unsure.
-> Keep this file in sync with reality as features land.
+> Status: implemented baseline (Next.js 16 App Router, React 19, Tailwind v4,
+> strict TS). Authoring, fill, dashboard/manage, draft edit, responses, live
+> preview, and React Query API flows are wired. See `AGENTS.md` — Next 16 has
+> breaking changes vs older conventions; consult `node_modules/next/dist/docs/`
+> when unsure. Keep this file in sync with reality as features land.
 
 ## Job
 
 - **Authoring** (`/forms`, `/forms/new`, `/forms/[key]`): a guided **field builder**
-  for a **non-technical** creator. They never see JSON and never drag — they add
+  for a **non-technical** creator. Builder mode is the default path; the JSON tab
+  is an advanced inspect/edit escape hatch for schema + uiSchema. Creators add
   fields and **click a field to edit it in a right-side drawer** (label, required,
   validation rules). The builder compiles plain-language field types to JSON Schema
   and uiSchema; reorder is up/down buttons. Live preview reuses the renderer.
@@ -33,13 +35,28 @@ authoring Manage page collide on `/forms/[key]`.
 
 ## Structure
 
-- **App Router.** Fetch configs in **Server Components** (no secrets on the client,
-  fast first paint). The interactive form is a **Client Component**.
+- **App Router.** Route `page.tsx` files stay as Server Components for routing and
+  composition, but API data fetching for app state belongs in leaf Client
+  Components through TanStack Query (React Query).
 - Routes: `/` lists forms (`GET /forms`); `/forms/[key]` fetches the published config
   and renders it.
 - Renderer shape: `SchemaForm` walks `schema.properties` + `schema.required` +
   `uiSchema`, delegating each field to a widget component. Form state via
   **react-hook-form**.
+
+## Data fetching: React Query only
+
+- Use TanStack Query (React Query) for all frontend API reads and mutations. Do not
+  add ad hoc component-level `fetch` calls for API state.
+- Keep API request functions in a small frontend API layer. Components call those
+  functions only through `useQuery`/`useMutation` wrappers.
+- Centralize query keys in key factories. Keys must be stable, scoped, and include
+  every parameter that changes the response, for example
+  `formsKeys.detail(key)` and `formsKeys.published(key)`.
+- Mutations must update or invalidate the narrowest affected keys after save,
+  publish, submit, or retry flows.
+- API base URL comes from `NEXT_PUBLIC_API_URL`; no other backend coupling. No
+  secrets in client code.
 
 ## Components: composition, reuse, shadcn-first
 
@@ -51,8 +68,16 @@ authoring Manage page collide on `/forms/[key]`.
 - **Compose, don't duplicate.** Build small, reusable components that combine through
   composition (children/slots) rather than copy-pasted variants or boolean-prop sprawl.
   Lift shared markup into one component the moment a second caller appears.
+- **React Doctor extraction rule.** Treat React Doctor `no-giant-component`,
+  `prefer-useReducer`, and custom dialog/popover findings as design feedback, not
+  cosmetic lint. Fix them with clean extraction: move cohesive UI regions into
+  app-level components, move related state transitions into a reducer/state module,
+  and replace hand-rolled overlays with existing shadcn/Radix primitives at the call
+  site. Do not bury the split as inline helper functions inside the same large file,
+  and do not edit `components/ui/*` unless the primitive itself is wrong for every
+  caller.
 - **Every page splits client/server.** A route's `page.tsx` is a **Server Component**
-  (data fetching, no secrets on the client); the interactive UI lives in a sibling
+  for composition; the interactive UI and React Query calls live in a sibling
   **Client Component** (`*-client.tsx`) it renders. Keep `'use client'` at the leaf,
   not the page.
 - **shadcn-first — check before you create.** This project uses shadcn/ui
@@ -103,8 +128,6 @@ Every data interaction handles all three explicitly:
 
 - **Tailwind** for styling — clean and legible over decorative. Avoid generic
   gradients/blue-purple palettes without reason; restrained shadows; sensible rhythm.
-- API base URL via `NEXT_PUBLIC_API_URL`; no other backend coupling. No secrets in
-  client code.
 - Strict TS; reuse the shared types (`UiSchema`, `FieldWidget`, etc.) rather than
   redefining shapes.
 - Keep components small and single-purpose; prefer deleting indirection over adding it.

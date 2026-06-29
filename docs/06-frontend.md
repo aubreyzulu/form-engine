@@ -1,30 +1,32 @@
 # 06 — Frontend
 
 Next.js 16 (App Router) + React 19, Tailwind v4. See [11-user-journeys.md](./11-user-journeys.md)
-for the *why* (who uses each surface and how). The frontend has **two surfaces**:
+for the _why_ (who uses each surface and how). The frontend has **two surfaces**:
 
 - **Authoring** (the Creator) — build and manage forms via a guided field builder.
 - **Fill** (the Submitter) — render a published form, validate, submit.
 
-Both share one renderer: the builder's live preview *is* the submitter's form.
+Both share one renderer: the builder's live preview _is_ the submitter's form.
 
 ## Routes
 
-| Route | Surface | Purpose |
-| --- | --- | --- |
-| `/forms` | Authoring | List forms with status + submission counts; Create button; empty state. |
-| `/forms/new` | Authoring | Build a new form (field builder + live preview). Saves as DRAFT. |
+| Route          | Surface   | Purpose                                                                             |
+| -------------- | --------- | ----------------------------------------------------------------------------------- |
+| `/forms`       | Authoring | List forms with status + submission counts; Create button; empty state.             |
+| `/forms/new`   | Authoring | Build a new form (field builder + live preview). Saves as DRAFT.                    |
 | `/forms/[key]` | Authoring | Manage a form: status, counts, draft warning, Publish, responses, edit → new draft. |
-| `/f/[key]` | Fill | Public: fetch the published config and render the interactive form. |
+| `/f/[key]`     | Fill      | Public: fetch the published config and render the interactive form.                 |
 
 > Authoring and Fill are kept on separate route trees so the two journeys don't
-> collide (see audit gap G4). The two read endpoints differ too: Fill needs the
-> *published* version; Authoring needs the *latest* version of any status (gap G1).
+> collide. The two read endpoints differ too: Fill needs the _published_ version;
+> Authoring needs the _latest_ version of any status.
 
 ## Authoring: the field builder
 
-The Creator is non-technical and **never sees JSON**. They build a form by filling
-in a form (principles in [11](./11-user-journeys.md)):
+The Creator is non-technical, so **Builder** is the default path. The **JSON** tab
+is an advanced inspect/edit escape hatch for schema + uiSchema rather than the
+primary authoring workflow. Creators build a form by filling in a form (principles
+in [11](./11-user-journeys.md)):
 
 - A **field list**; **Add field** appends one. **Clicking a field opens a right-side
   drawer/sheet** to set its label, required toggle, and validation rules.
@@ -33,8 +35,11 @@ in a form (principles in [11](./11-user-journeys.md)):
   relevant options (progressive disclosure).
 - **Reorder** via up/down buttons (no drag-and-drop).
 - **Live preview** renders the real form using the shared renderer below.
+- **Builder | JSON tabs** keep the visual builder and raw config in one workflow;
+  valid JSON edits round-trip through the builder without dropping stable field
+  keys, labels, values, or supported validation metadata.
 - Editing an existing draft reconstructs the field rows from stored `schema` +
-  `uiSchema` (gap G6).
+  `uiSchema`.
 
 ## The renderer (shared by preview + Fill)
 
@@ -60,20 +65,27 @@ SchemaForm
 
 ## The three UI states (Fill, and the manage page)
 
-| State | Trigger | UX |
-| --- | --- | --- |
-| **Loading** | Fetching config; submitting | Skeleton for the form; disabled button + spinner on submit. |
-| **Error** | Config fetch fails / network / server `5xx` | Inline error card with retry; submit-time `422` maps errors back onto fields. |
-| **Success** | `201` from submission | Success panel echoing what was submitted + which form version validated it; submit-another option. |
+| State       | Trigger                                     | UX                                                                                                 |
+| ----------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| **Loading** | Fetching config; submitting                 | Skeleton for the form; disabled button + spinner on submit.                                        |
+| **Error**   | Config fetch fails / network / server `5xx` | Inline error card with retry; submit-time `422` maps errors back onto fields.                      |
+| **Success** | `201` from submission                       | Success panel echoing what was submitted + which form version validated it; submit-another option. |
 
 A form that doesn't clearly show loading, errors, and success is a poor experience
 regardless of how good the engine is.
 
 ## Data fetching
 
-- Server Components fetch configs (no client secrets, fast first paint).
-- Mutations (create/save/publish/submit) are client calls; server validation errors
-  (`422 details`) are mapped onto the matching react-hook-form fields.
+- TanStack Query (React Query) is the frontend API state layer. Reads and mutations
+  go through query/mutation hooks, not ad hoc component-level `fetch` calls.
+- Route `page.tsx` files stay as Server Components for routing/composition; leaf
+  Client Components own React Query calls and interactive state.
+- Query keys are centralized key factories, for example `formsKeys.detail(key)` and
+  `formsKeys.published(key)`. Keys must include every variable that changes the
+  response.
+- Mutations (create/save/publish/submit) invalidate or update the narrowest affected
+  keys; server validation errors (`422 details`) are mapped onto the matching
+  react-hook-form fields.
 - API base URL comes from `NEXT_PUBLIC_API_URL`.
 
 ## Styling
