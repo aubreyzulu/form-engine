@@ -19,18 +19,9 @@ import { SubmissionResponseViewer } from '@/app/forms/[key]/submission-response-
 import { CreatorAppShell } from '@/components/creator-app-shell';
 import { FormStatusBadge } from '@/components/form-status-badge';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   createDraftVersion,
   getManageForm,
@@ -269,48 +260,6 @@ function ManageFormContent({
           detail={form.version.status === 'PUBLISHED' ? 'Current live version' : 'Not live yet'}
         />
       </section>
-
-      <Card className="rounded">
-        <CardHeader className="border-b">
-          <CardTitle className="text-xl">Latest configuration</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {fields.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="h-11 px-6">Label</TableHead>
-                  <TableHead>Key</TableHead>
-                  <TableHead>Widget</TableHead>
-                  <TableHead>Required</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {fields.map((field) => (
-                  <TableRow key={field.key}>
-                    <TableCell className="px-6 font-medium">{field.label}</TableCell>
-                    <TableCell className="font-mono text-sm text-muted-foreground">
-                      {field.key}
-                    </TableCell>
-                    <TableCell>{field.widget}</TableCell>
-                    <TableCell>
-                      {field.required ? (
-                        <Badge className="bg-success/15 text-success">Required</Badge>
-                      ) : (
-                        <span className="text-muted-foreground">Optional</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="px-6 py-10 text-muted-foreground">
-              This draft does not have fields yet.
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
       <SubmissionResponseViewer
         error={submissionsError}

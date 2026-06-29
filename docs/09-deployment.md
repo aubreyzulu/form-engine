@@ -7,7 +7,7 @@ the graded live URL). Both are required by the brief.
 
 `docker-compose.yml` brings up the full local stack:
 
-```
+```text
 postgres   → Postgres 16, volume-backed, healthcheck
 api        → NestJS API, waits for Postgres, migrates + seeds on start
 web        → Next.js app, waits for API health

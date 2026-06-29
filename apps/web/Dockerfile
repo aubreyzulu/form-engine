@@ -16,19 +16,19 @@ RUN pnpm install --frozen-lockfile
 
 FROM deps AS build
 
-ARG NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1
+ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 COPY apps/web apps/web
 COPY packages/shared packages/shared
 
-RUN pnpm build:web
+RUN test -n "$NEXT_PUBLIC_API_URL" && pnpm build:web
 
 FROM base AS runtime
 
 ENV NODE_ENV=production
 ENV PORT=3000
-ARG NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1
+ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 COPY --from=deps /app/node_modules ./node_modules
@@ -41,6 +41,10 @@ COPY --from=build /app/apps/web/public ./apps/web/public
 COPY --from=build /app/apps/web/next.config.ts ./apps/web/next.config.ts
 COPY --from=build /app/packages/shared/package.json ./packages/shared/package.json
 COPY --from=build /app/packages/shared/dist ./packages/shared/dist
+
+RUN addgroup -S nextjs && adduser -S nextjs -G nextjs && chown -R nextjs:nextjs /app
+
+USER nextjs
 
 EXPOSE 3000
 

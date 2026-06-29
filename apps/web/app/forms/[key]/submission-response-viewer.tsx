@@ -9,6 +9,13 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -19,6 +26,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { SubmissionListResponse, SubmissionResponse } from '@/lib/forms-api';
+import { readString, schemaFieldRecords } from '@/lib/schema-fields';
 
 export type ResponseFieldSummary = {
   key: string;
@@ -38,7 +46,7 @@ export function SubmissionResponseViewer({
 }) {
   const items = submissions?.items ?? [];
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const selected = items.find((submission) => submission.id === selectedId) ?? items[0] ?? null;
+  const selected = items.find((submission) => submission.id === selectedId) ?? null;
 
   return (
     <Card className="rounded">
@@ -61,14 +69,20 @@ export function SubmissionResponseViewer({
             <AlertDescription>{error.message}</AlertDescription>
           </Alert>
         ) : items.length > 0 ? (
-          <div className="grid border-t-0 xl:grid-cols-[minmax(0,1.25fr)_minmax(24rem,0.75fr)]">
+          <>
             <ResponseTable
               selectedId={selected?.id ?? null}
               submissions={items}
               onSelect={setSelectedId}
             />
-            <ResponseDetail fields={fields} submission={selected} />
-          </div>
+            <ResponseSheet
+              fallbackFields={fields}
+              submission={selected}
+              onOpenChange={(open) => {
+                if (!open) setSelectedId(null);
+              }}
+            />
+          </>
         ) : (
           <div className="px-6 py-10 text-muted-foreground">
             No responses have been submitted yet.
@@ -108,7 +122,10 @@ function ResponseTable({
                   {formatDateDistance(submission.createdAt)}
                 </span>
               </span>
-              <Badge variant="outline">v{submission.formVersion?.version ?? '-'}</Badge>
+              <span className="flex items-center gap-2">
+                <Badge variant="outline">v{submission.formVersion?.version ?? '-'}</Badge>
+                <Eye className="size-4 text-muted-foreground" aria-hidden="true" />
+              </span>
             </span>
             <span className="line-clamp-2 text-sm text-muted-foreground">
               {formatSubmissionPreview(submission.data)}
@@ -166,68 +183,90 @@ function ResponseTable({
   );
 }
 
-function ResponseDetail({
-  fields,
+function ResponseSheet({
+  fallbackFields,
+  onOpenChange,
   submission,
 }: {
-  fields: ResponseFieldSummary[];
+  fallbackFields: ResponseFieldSummary[];
+  onOpenChange: (open: boolean) => void;
   submission: SubmissionResponse | null;
 }) {
-  if (!submission) return null;
+  return (
+    <Sheet open={Boolean(submission)} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full overflow-y-auto sm:!max-w-3xl lg:!max-w-4xl">
+        {submission ? (
+          <>
+            <SheetHeader className="border-b px-6 py-5">
+              <p className="font-mono text-sm text-muted-foreground">
+                {submissionReference(submission)}
+              </p>
+              <SheetTitle className="text-2xl">Response detail</SheetTitle>
+              <SheetDescription>
+                Submitted {formatDateDistance(submission.createdAt)} and validated with form version
+                v{submission.formVersion?.version ?? '-'}.
+              </SheetDescription>
+            </SheetHeader>
+            <ResponseDetailContent fallbackFields={fallbackFields} submission={submission} />
+          </>
+        ) : null}
+      </SheetContent>
+    </Sheet>
+  );
+}
 
+function ResponseDetailContent({
+  fallbackFields,
+  submission,
+}: {
+  fallbackFields: ResponseFieldSummary[];
+  submission: SubmissionResponse;
+}) {
+  const fields = fieldsForSubmission(submission, fallbackFields);
   const rows = responseRows(fields, submission.data);
 
   return (
-    <aside className="border-t bg-muted/20 p-6 xl:border-l xl:border-t-0">
-      <div className="flex flex-col gap-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="font-mono text-sm text-muted-foreground">
-              {submissionReference(submission)}
-            </p>
-            <h2 className="mt-1 text-2xl font-semibold tracking-normal">Response detail</h2>
-          </div>
-          <Badge className="bg-success/15 text-success">
-            <CheckCircle2 className="size-3.5" />
-            Stored
-          </Badge>
-        </div>
-
-        <div className="grid gap-3 text-sm sm:grid-cols-2">
-          <DetailMetric label="Submitted" value={formatDateDistance(submission.createdAt)} />
-          <DetailMetric
-            label="Validated with"
-            value={`Form version v${submission.formVersion?.version ?? '-'}`}
-          />
-        </div>
-
-        <div className="rounded border bg-background">
-          <div className="flex items-center justify-between border-b px-4 py-3">
-            <div>
-              <h3 className="font-medium">Submitted answers</h3>
-              <p className="text-sm text-muted-foreground">
-                Values are shown exactly as stored after server validation.
-              </p>
-            </div>
-            <FileText className="size-4 text-muted-foreground" />
-          </div>
-          <dl className="divide-y">
-            {rows.map((row) => (
-              <div
-                className="grid gap-2 px-4 py-3 sm:grid-cols-[minmax(10rem,0.45fr)_1fr]"
-                key={row.key}
-              >
-                <dt>
-                  <span className="block font-medium">{row.label}</span>
-                  <span className="font-mono text-xs text-muted-foreground">{row.key}</span>
-                </dt>
-                <dd className="break-words text-muted-foreground">{row.value || '-'}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
+    <div className="flex flex-col gap-5 px-6 pb-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <Badge className="bg-success/15 text-success">
+          <CheckCircle2 className="size-3.5" />
+          Stored
+        </Badge>
       </div>
-    </aside>
+
+      <div className="grid gap-3 text-sm sm:grid-cols-2">
+        <DetailMetric label="Submitted" value={formatDateDistance(submission.createdAt)} />
+        <DetailMetric
+          label="Validated with"
+          value={`Form version v${submission.formVersion?.version ?? '-'}`}
+        />
+      </div>
+
+      <div className="rounded border bg-background">
+        <div className="flex items-center justify-between border-b px-4 py-3">
+          <div>
+            <h3 className="font-medium">Submitted answers</h3>
+            <p className="text-sm text-muted-foreground">
+              Values are shown exactly as stored after server validation.
+            </p>
+          </div>
+          <FileText className="size-4 text-muted-foreground" />
+        </div>
+        <dl className="divide-y">
+          {rows.map((row) => (
+            <div
+              className="grid gap-2 px-4 py-3 sm:grid-cols-[minmax(10rem,0.45fr)_1fr]"
+              key={row.key}
+            >
+              <dt>
+                <span className="block font-medium">{row.label}</span>
+              </dt>
+              <dd className="break-words text-muted-foreground">{row.value || '-'}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </div>
   );
 }
 
@@ -248,14 +287,47 @@ function responseRows(fields: ResponseFieldSummary[], data: unknown) {
     value: formatSubmittedValue(record[field.key]),
   }));
   const knownKeys = new Set(fields.map((field) => field.key));
-  const extraRows = Object.entries(record)
-    .filter(([key]) => !knownKeys.has(key))
-    .map(([key, value]) => ({
-      key,
-      label: key,
-      value: formatSubmittedValue(value),
-    }));
+  const extraRows = [];
+  for (const [key, value] of Object.entries(record)) {
+    if (!knownKeys.has(key)) {
+      extraRows.push({
+        key,
+        label: humanizeFieldKey(key),
+        value: formatSubmittedValue(value),
+      });
+    }
+  }
   return [...rows, ...extraRows];
+}
+
+function humanizeFieldKey(key: string) {
+  return (
+    key
+      .replace(/[_-]+/g, ' ')
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/^./, (letter) => letter.toUpperCase()) || key
+  );
+}
+
+function fieldsForSubmission(
+  submission: SubmissionResponse,
+  fallbackFields: ResponseFieldSummary[],
+) {
+  const version = submission.formVersion;
+  if (!version || version.schema === undefined || version.uiSchema === undefined) {
+    return fallbackFields;
+  }
+
+  const fields = schemaFieldRecords(version.schema, version.uiSchema).map(
+    ({ key, property, uiField }) => ({
+      key,
+      label: readString(uiField.label) ?? key,
+      widget: readString(uiField.widget) ?? readString(property.type) ?? 'custom',
+    }),
+  );
+  return fields.length > 0 ? fields : fallbackFields;
 }
 
 function responseRecord(data: unknown): Record<string, unknown> {
@@ -280,5 +352,6 @@ function formatSubmissionPreview(data: unknown) {
 }
 
 function submissionReference(submission: SubmissionResponse) {
-  return `SUB-${submission.id.slice(0, 8).toUpperCase()}`;
+  const normalized = submission.id.replace(/[^a-z0-9]/gi, '').toUpperCase();
+  return `SUB-${normalized.slice(0, 12) || 'UNKNOWN'}`;
 }

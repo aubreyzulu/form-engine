@@ -66,6 +66,8 @@ export type SubmissionResponse = {
   formVersionId: string;
   formVersion?: {
     version: number;
+    schema?: unknown;
+    uiSchema?: unknown;
   };
   data: unknown;
   createdAt: string;

@@ -7,8 +7,16 @@ import { FormsService } from '../forms/forms.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateSubmissionDto, ListSubmissionsQueryDto } from './dto';
 
+type SubmissionVersionMetadata = {
+  formVersion: {
+    version: number;
+    schema: Prisma.JsonValue;
+    uiSchema: Prisma.JsonValue;
+  };
+};
+
 export interface PaginatedSubmissions {
-  items: Submission[];
+  items: Array<Submission & SubmissionVersionMetadata>;
   total: number;
   skip: number;
   take: number;
@@ -55,7 +63,7 @@ export class SubmissionsService {
       this.prisma.submission.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        include: { formVersion: { select: { version: true } } },
+        include: { formVersion: { select: { version: true, schema: true, uiSchema: true } } },
         skip: query.skip,
         take: query.take,
       }),
@@ -67,7 +75,9 @@ export class SubmissionsService {
   async getById(id: string): Promise<Submission> {
     const submission = await this.prisma.submission.findUnique({
       where: { id },
-      include: { formVersion: { select: { version: true, formId: true } } },
+      include: {
+        formVersion: { select: { version: true, formId: true, schema: true, uiSchema: true } },
+      },
     });
     if (!submission) {
       throw new NotFoundError(ErrorCode.SUBMISSION_NOT_FOUND, `Submission "${id}" was not found.`);

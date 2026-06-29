@@ -122,12 +122,52 @@ const draftWithLiveVersionResponse = {
   publishedVersion: 1,
 };
 
+const versionOneSchema = {
+  type: 'object',
+  properties: {
+    fullName: { type: 'string' },
+    country: { type: 'string', enum: ['GB', 'ZM'] },
+    acceptedTerms: { type: 'boolean' },
+  },
+  required: ['fullName', 'acceptedTerms'],
+  additionalProperties: false,
+};
+
+const versionOneUiSchema = {
+  order: ['fullName', 'country', 'acceptedTerms'],
+  fields: {
+    fullName: { widget: 'text', label: 'Full legal name' },
+    country: { widget: 'select', label: 'Country' },
+    acceptedTerms: { widget: 'checkbox', label: 'Terms accepted' },
+  },
+};
+
+const versionTwoSchema = {
+  type: 'object',
+  properties: {
+    fullName: { type: 'string' },
+    country: { type: 'string', enum: ['GB', 'US', 'ZM'] },
+    reviewNote: { type: 'string' },
+  },
+  required: ['fullName', 'country'],
+  additionalProperties: false,
+};
+
+const versionTwoUiSchema = {
+  order: ['fullName', 'country', 'reviewNote'],
+  fields: {
+    fullName: { widget: 'text', label: 'Applicant legal name' },
+    country: { widget: 'select', label: 'Registration country' },
+    reviewNote: { widget: 'textarea', label: 'Reviewer note' },
+  },
+};
+
 const submissionsResponse = {
   items: [
     {
       id: 'submission-1',
       formVersionId: 'version-1',
-      formVersion: { version: 1 },
+      formVersion: { version: 1, schema: versionOneSchema, uiSchema: versionOneUiSchema },
       data: { fullName: 'Ada Lovelace', country: 'GB', acceptedTerms: true },
       createdAt: '2026-06-28T12:00:00.000Z',
     },
@@ -143,7 +183,7 @@ const multipleSubmissionsResponse = {
     {
       id: 'submission-2',
       formVersionId: 'version-2',
-      formVersion: { version: 2 },
+      formVersion: { version: 2, schema: versionTwoSchema, uiSchema: versionTwoUiSchema },
       data: { fullName: 'Grace Hopper', country: 'US', reviewNote: 'Needs follow-up' },
       createdAt: '2026-06-28T13:00:00.000Z',
     },
@@ -202,16 +242,16 @@ describe('ManageFormPageClient', () => {
     expect(screen.getByText('Draft')).toBeInTheDocument();
     expect(screen.getByText('v2')).toBeInTheDocument();
     expect(screen.getByText('12')).toBeInTheDocument();
-    expect(screen.getByRole('cell', { name: 'Country' })).toBeInTheDocument();
-    expect(screen.getByRole('cell', { name: 'country' })).toBeInTheDocument();
-    expect(screen.getByRole('cell', { name: 'select' })).toBeInTheDocument();
-    expect(screen.getByRole('cell', { name: 'Full legal name' })).toBeInTheDocument();
-    expect(screen.getAllByText('Required')).toHaveLength(2);
+    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getByText('1 required')).toBeInTheDocument();
+    expect(screen.queryByText('Latest configuration')).not.toBeInTheDocument();
+    expect(screen.queryByRole('cell', { name: 'Country' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('cell', { name: 'country' })).not.toBeInTheDocument();
     expect(screen.getAllByText(/fullName: Ada Lovelace/)).toHaveLength(2);
     expect(screen.getAllByText(/acceptedTerms: Yes/)).toHaveLength(2);
-    expect(screen.getByRole('heading', { name: 'Response detail' })).toBeInTheDocument();
-    expect(screen.getByText('Ada Lovelace')).toBeInTheDocument();
-    expect(screen.getByText('Form version v1')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Response detail' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Form version v1')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'No live form' })).toBeDisabled();
     expect(screen.queryByRole('link', { name: 'Responses' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument();
@@ -232,13 +272,19 @@ describe('ManageFormPageClient', () => {
 
     renderWithQueryClient();
 
-    expect(await screen.findByText('Ada Lovelace')).toBeInTheDocument();
+    expect(await screen.findAllByText(/fullName: Ada Lovelace/)).toHaveLength(2);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
     const viewButtons = screen.getAllByRole('button', { name: 'View' });
     await user.click(viewButtons[1]!);
 
-    expect(await screen.findByText('Grace Hopper')).toBeInTheDocument();
-    expect(screen.getByText('Form version v2')).toBeInTheDocument();
+    const detail = await screen.findByRole('dialog');
+    expect(detail).toHaveTextContent('Response detail');
+    expect(detail).toHaveTextContent('Grace Hopper');
+    expect(detail).toHaveTextContent('Applicant legal name');
+    expect(detail).toHaveTextContent('Registration country');
+    expect(detail).toHaveTextContent('Reviewer note');
+    expect(detail).toHaveTextContent('Form version v2');
     expect(screen.getByText('Needs follow-up')).toBeInTheDocument();
   });
 

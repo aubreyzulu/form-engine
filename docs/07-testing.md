@@ -80,7 +80,7 @@ edge cases that are easiest to regress:
 
 ## Running
 
-```
+```bash
 pnpm test            # turbo: all packages
 pnpm --filter api test
 pnpm --filter api test:e2e
