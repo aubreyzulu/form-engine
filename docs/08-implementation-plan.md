@@ -85,11 +85,11 @@ edit → new draft). Builder compiles field config ⇄ schema + uiSchema.
 
 ## Definition of done (whole assignment)
 
-- [ ] Configuration-driven validation (no hardcoded field rules) — demonstrated + tested.
-- [ ] Historical integrity (immutable versions, pinned submissions) — demonstrated + tested.
-- [ ] Clean REST API with structured errors + correct status codes.
-- [ ] Dynamic frontend with loading/error/success.
-- [ ] Engine + API tests green.
-- [ ] `docker compose up` works from clean checkout.
-- [ ] Hosted on Railway with live URLs in README.
-- [ ] README covers run steps, data model, and trade-offs.
+- [x] Configuration-driven validation (no hardcoded field rules) — demonstrated + tested.
+- [x] Historical integrity (immutable versions, pinned submissions) — demonstrated + tested.
+- [x] Clean REST API with structured errors + correct status codes.
+- [x] Dynamic frontend with loading/error/success.
+- [x] Engine, API, shared, and frontend tests green.
+- [x] `docker compose up --build` works with Postgres, API, and web.
+- [x] Hosted on Railway with live URLs in README.
+- [x] README covers run steps, data model, deployment, and trade-offs.

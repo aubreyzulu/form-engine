@@ -137,6 +137,22 @@ const submissionsResponse = {
   take: 50,
 };
 
+const multipleSubmissionsResponse = {
+  items: [
+    submissionsResponse.items[0],
+    {
+      id: 'submission-2',
+      formVersionId: 'version-2',
+      formVersion: { version: 2 },
+      data: { fullName: 'Grace Hopper', country: 'US', reviewNote: 'Needs follow-up' },
+      createdAt: '2026-06-28T13:00:00.000Z',
+    },
+  ],
+  total: 2,
+  skip: 0,
+  take: 50,
+};
+
 const emptySubmissionsResponse = {
   items: [],
   total: 0,
@@ -191,13 +207,39 @@ describe('ManageFormPageClient', () => {
     expect(screen.getByRole('cell', { name: 'select' })).toBeInTheDocument();
     expect(screen.getByRole('cell', { name: 'Full legal name' })).toBeInTheDocument();
     expect(screen.getAllByText('Required')).toHaveLength(2);
-    expect(screen.getByText(/fullName: Ada Lovelace/)).toBeInTheDocument();
-    expect(screen.getByText(/acceptedTerms: Yes/)).toBeInTheDocument();
+    expect(screen.getAllByText(/fullName: Ada Lovelace/)).toHaveLength(2);
+    expect(screen.getAllByText(/acceptedTerms: Yes/)).toHaveLength(2);
+    expect(screen.getByRole('heading', { name: 'Response detail' })).toBeInTheDocument();
+    expect(screen.getByText('Ada Lovelace')).toBeInTheDocument();
+    expect(screen.getByText('Form version v1')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'No live form' })).toBeDisabled();
+    expect(screen.queryByRole('link', { name: 'Responses' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Compliance Officer')).not.toBeInTheDocument();
+    expect(screen.queryByText('Collapse')).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       'http://localhost:4000/api/v1/forms/ownership-declaration/manage',
       expect.any(Object),
     );
+  });
+
+  it('opens a selected response detail from the submissions table', async () => {
+    const user = userEvent.setup();
+    mockFetchRoutes({
+      '/forms/ownership-declaration/manage': [okResponse(draftManageResponse)],
+      '/forms/ownership-declaration/submissions': [okResponse(multipleSubmissionsResponse)],
+    });
+
+    renderWithQueryClient();
+
+    expect(await screen.findByText('Ada Lovelace')).toBeInTheDocument();
+
+    const viewButtons = screen.getAllByRole('button', { name: 'View' });
+    await user.click(viewButtons[1]!);
+
+    expect(await screen.findByText('Grace Hopper')).toBeInTheDocument();
+    expect(screen.getByText('Form version v2')).toBeInTheDocument();
+    expect(screen.getByText('Needs follow-up')).toBeInTheDocument();
   });
 
   it('shows an error state and retries both authoring queries', async () => {

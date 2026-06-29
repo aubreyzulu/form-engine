@@ -3,35 +3,26 @@
 Two ways to run: **docker-compose** (local, one command) and **Railway** (hosted,
 the graded live URL). Both are required by the brief.
 
-## Local — Postgres compose + pnpm apps
+## Local — full Docker Compose
 
-`docker-compose.yml` currently brings up the backing Postgres database:
+`docker-compose.yml` brings up the full local stack:
 
 ```
 postgres   → Postgres 16, volume-backed, healthcheck
+api        → NestJS API, waits for Postgres, migrates + seeds on start
+web        → Next.js app, waits for API health
 ```
-
-The API and web app run through pnpm from the workspace root:
 
 ```bash
 cp .env.example .env
-cp apps/api/.env.example apps/api/.env
-cp apps/web/.env.example apps/web/.env.local
-docker compose up -d postgres
-cd apps/api
-npx prisma migrate dev
-cd ../..
-pnpm --filter api db:seed
-pnpm --filter api dev
-pnpm --filter web dev
+docker compose up --build
 ```
 
 App at `http://localhost:3000`, API at `http://localhost:4000`, Swagger at
 `http://localhost:4000/api/docs`.
 
-Full one-command Docker for `api` and `web` is still a deployment gap: the docs
-should not claim it until `apps/api/Dockerfile`, `apps/web/Dockerfile`, and app
-services in `docker-compose.yml` exist.
+The API container runs the same release path as Railway: `prisma migrate deploy`
+then the idempotent production seed before `node dist/src/main.js`.
 
 The migration directory is intentionally created by Prisma, not hand-written. To
 create the initial migration with the local compose database, run
@@ -39,13 +30,13 @@ create the initial migration with the local compose database, run
 
 ## Env vars
 
-| Var                                                                  | Used by       | Example                                           |
-| -------------------------------------------------------------------- | ------------- | ------------------------------------------------- |
-| `DATABASE_URL`                                                       | api (Prisma)  | `postgresql://app:app@localhost:5432/form-engine` |
-| `NEXT_PUBLIC_API_URL`                                                | web           | `http://localhost:4000/api/v1`                    |
-| `PORT`                                                               | api           | `4000`                                            |
-| `CORS_ORIGINS`                                                       | api           | `http://localhost:3000`                           |
-| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT` | local compose | `app`, `app`, `form-engine`, `5432`               |
+| Var                                                                          | Used by       | Example                                      |
+| ---------------------------------------------------------------------------- | ------------- | -------------------------------------------- |
+| `DATABASE_URL`                                                               | api (Prisma)  | `postgresql://app@postgres:5432/form-engine` |
+| `NEXT_PUBLIC_API_URL`                                                        | web           | `http://localhost:4000/api/v1`               |
+| `PORT`                                                                       | api           | `4000`                                       |
+| `CORS_ORIGINS`                                                               | api           | `http://localhost:3000`                      |
+| `POSTGRES_USER`, `POSTGRES_DB`, `POSTGRES_PORT`, `POSTGRES_HOST_AUTH_METHOD` | local compose | `app`, `form-engine`, `5432`, `trust`        |
 
 `.env.example` files committed; real `.env` git-ignored.
 
@@ -68,15 +59,13 @@ reviewer to "use it without setting it up locally."
 ### Deploy outline
 
 - Push repo → Railway builds each app with configured build/start commands
-  (for example, Nixpacks). Add `apps/api/Dockerfile` and `apps/web/Dockerfile`
-  first if choosing Dockerfile-based Railway services.
+  (Railway currently uses repo-level build/start commands).
 - Set service env vars (DB URL injected by the plugin; `NEXT_PUBLIC_API_URL` set to
   the api domain).
 - API service start command: `pnpm start:api`. This runs
   `pnpm railway:api:release` (`prisma migrate deploy` + `db:seed:prod`) before
   starting the production Nest server.
-- Capture the two public URLs (+ note that no credentials are needed — Assignment A
-  has no auth) in the top-level README.
+- Public URLs and the no-auth note are captured in the top-level README.
 
 ## CORS
 
