@@ -121,12 +121,19 @@ export class FormsService {
    * form's total submission count. The creator's manage page needs to load a
    * draft-only form, which the published-only render read cannot serve. See G1.
    */
-  async getFormForManage(
-    key: string,
-  ): Promise<{ form: Form; version: FormVersion; submissionCount: number }> {
+  async getFormForManage(key: string): Promise<{
+    form: Form;
+    version: FormVersion;
+    publishedVersion: number | null;
+    submissionCount: number;
+  }> {
     const form = await this.findFormOrThrow(key);
     const version = await this.prisma.formVersion.findFirst({
       where: { formId: form.id },
+      orderBy: { version: 'desc' },
+    });
+    const published = await this.prisma.formVersion.findFirst({
+      where: { formId: form.id, status: 'PUBLISHED' },
       orderBy: { version: 'desc' },
     });
     if (!version) {
@@ -136,7 +143,7 @@ export class FormsService {
     const submissionCount = await this.prisma.submission.count({
       where: { formVersion: { formId: form.id } },
     });
-    return { form, version, submissionCount };
+    return { form, version, publishedVersion: published?.version ?? null, submissionCount };
   }
 
   // --- Versions --------------------------------------------------------------

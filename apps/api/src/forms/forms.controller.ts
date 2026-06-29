@@ -85,12 +85,14 @@ export class FormsController {
   @ApiResponse({ status: 200, description: 'Latest authoring config returned.' })
   @ApiResponse({ status: 404, description: 'FORM_NOT_FOUND or VERSION_NOT_FOUND.' })
   async manageForm(@Param('key') key: string) {
-    const { form, version, submissionCount } = await this.forms.getFormForManage(key);
+    const { form, version, publishedVersion, submissionCount } =
+      await this.forms.getFormForManage(key);
     return {
       id: form.id,
       key: form.key,
       name: form.name,
       description: form.description,
+      publishedVersion,
       submissionCount,
       version: {
         version: version.version,
