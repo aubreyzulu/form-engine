@@ -23,7 +23,7 @@ Mirrors the brief's suggested 3-day shape but organised by milestone, not clock.
 - `apps/api`: Prisma installed; `schema.prisma` per [03](./03-data-model.md).
 - First migration; Prisma module/service in Nest (DI-injectable).
 - Seed script: two published forms (BO declaration + contact).
-- **Done when:** `prisma migrate dev` + seed produce a populated DB; `/health` green.
+- **Done when:** `prisma migrate dev` + seed produce a populated DB; `/api/v1/health` green.
 
 ## Phase 3 — Backend engine + API
 

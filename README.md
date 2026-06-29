@@ -184,12 +184,18 @@ Useful package scripts:
 pnpm --filter api prisma:migrate:dev
 pnpm --filter api prisma:migrate
 pnpm --filter api db:seed
+pnpm railway:api:release
 pnpm --filter web dev
 ```
 
 Use `prisma:migrate:dev` only while creating a new Prisma migration locally.
 For setup, CI, and deploy-style verification, use `prisma:migrate`, which runs
 `prisma migrate deploy` idempotently.
+
+Railway starts the API with `pnpm start:api`, which runs `pnpm railway:api:release`
+before `node dist/src/main.js`. The release step runs checked-in Prisma migrations
+against the Railway `DATABASE_URL` and then runs the idempotent seed so the hosted
+app has realistic review data before the API starts.
 
 ## Assessment Notes
 
@@ -202,6 +208,5 @@ For setup, CI, and deploy-style verification, use `prisma:migrate`, which runs
 
 ## Current Gaps
 
-Notable remaining items include full-stack Docker services, Railway
-migration/seed verification, and ongoing documentation refresh as implementation
-details change.
+Notable remaining items include full-stack Docker services and ongoing
+documentation refresh as implementation details change.
