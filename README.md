@@ -15,6 +15,32 @@ exact form version that accepted it.
 - Persist responses against the exact `formVersionId` used for validation.
 - Expose REST API docs through Swagger.
 
+## Reviewer Evidence Map
+
+| Assessment concern         | Where it is handled                                                                                                                                      |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dynamic form configuration | Forms are stored as JSON Schema + `uiSchema` in `FormVersion`, then rendered by the shared schema renderer. No user-facing form is hardcoded.            |
+| Strong validation          | `@formbuilder/shared` wraps Ajv and is imported by both the API and web app. The server re-validates every submission before write.                      |
+| Historical integrity       | Published versions are immutable. Each submission stores `formVersionId`, so old responses stay attached to the exact rules that accepted them.          |
+| Form evolution             | Editing a published form creates a new draft version. The manage page shows version history, current live version, drafts, and immutable older versions. |
+| Error handling             | API errors use a consistent `{ error: { code, message, details? } }` envelope; validation details map back to fields in the frontend.                    |
+| Three UI states            | API-backed screens include loading skeletons, retryable error states, empty states, and success/confirmation paths covered by frontend tests.            |
+| Deployment readiness       | Docker Compose runs the full stack locally; Railway runs migrations and an idempotent seed before API startup; Swagger is available on the hosted API.   |
+| Trade-off explanation      | See [Trade-off Analysis](#trade-off-analysis) for schema, routing, validation, consistency, and production-scaling decisions.                            |
+
+## Fast Review Path
+
+Use the hosted deployment first:
+
+- Open the web app: `https://form-engine.aubreyzulu.com`
+- Inspect API docs: `https://form-engine-api.up.railway.app/api/docs`
+- Open a seeded form such as `/forms/grant-due-diligence`, review its version
+  history and submissions, then open `/f/grant-due-diligence` to submit a live
+  response.
+
+For local review, `docker compose up --build` starts Postgres, API, migrations,
+seed data, and the web app with one command.
+
 ## Codebase Structure
 
 ```text
