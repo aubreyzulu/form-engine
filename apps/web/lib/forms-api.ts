@@ -1,4 +1,5 @@
 import { apiRequest } from '@/lib/api-client';
+import { schemaFieldRecords } from '@/lib/schema-fields';
 
 export type FormVersionStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 
@@ -45,6 +46,18 @@ export type FormVersionResponse = {
   status: FormVersionStatus;
   schema: unknown;
   uiSchema: unknown;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type FormVersionSummaryResponse = {
+  id: string;
+  formId: string;
+  version: number;
+  status: FormVersionStatus;
+  fieldCount: number;
+  requiredCount: number;
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -123,8 +136,18 @@ export function getFormVersion(key: string, version: number) {
   return apiRequest<FormVersionResponse>(`/forms/${key}/versions/${version}`);
 }
 
-export function listFormVersions(key: string) {
-  return apiRequest<FormVersionResponse[]>(`/forms/${key}/versions`);
+export async function listFormVersions(key: string): Promise<FormVersionSummaryResponse[]> {
+  const versions = await apiRequest<FormVersionResponse[]>(`/forms/${key}/versions`);
+
+  return versions.map(({ schema, uiSchema, ...version }) => {
+    const fields = schemaFieldRecords(schema, uiSchema);
+
+    return {
+      ...version,
+      fieldCount: fields.length,
+      requiredCount: fields.filter((field) => field.required).length,
+    };
+  });
 }
 
 export async function createFormDraft(payload: CreateFormPayload): Promise<DraftIdentity> {

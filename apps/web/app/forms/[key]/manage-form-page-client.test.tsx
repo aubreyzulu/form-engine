@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -45,6 +45,14 @@ function renderWithQueryClient() {
       <ManageFormPageClient formKey="ownership-declaration" />
     </QueryClientProvider>,
   );
+}
+
+function getVersionHistory() {
+  return within(screen.getByRole('region', { name: 'Version history' }));
+}
+
+function getVersionRow(version: string) {
+  return within(getVersionHistory().getByRole('article', { name: `Version ${version}` }));
 }
 
 function okResponse(body: unknown): Response {
@@ -297,15 +305,10 @@ describe('ManageFormPageClient', () => {
     expect(screen.queryByText('Latest configuration')).not.toBeInTheDocument();
     expect(screen.queryByRole('cell', { name: 'Country' })).not.toBeInTheDocument();
     expect(screen.queryByRole('cell', { name: 'country' })).not.toBeInTheDocument();
-    expect(screen.getByText('Version history')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'v2' })).toBeInTheDocument();
-    expect(screen.getByText('Latest')).toBeInTheDocument();
-    expect(
-      screen.getAllByText((_, element) => {
-        const text = element?.textContent ?? '';
-        return text.includes('2 fields') && text.includes('1 required');
-      }).length,
-    ).toBeGreaterThan(0);
+    const latestVersionRow = getVersionRow('v2');
+    expect(latestVersionRow.getByRole('heading', { name: 'v2' })).toBeInTheDocument();
+    expect(latestVersionRow.getByText('Latest')).toBeInTheDocument();
+    expect(latestVersionRow.getByText(/2 fields/)).toHaveTextContent('1 required');
     expect(screen.getAllByText(/fullName: Ada Lovelace/)).toHaveLength(2);
     expect(screen.getAllByText(/acceptedTerms: Yes/)).toHaveLength(2);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -389,12 +392,12 @@ describe('ManageFormPageClient', () => {
     expect(
       await screen.findByRole('heading', { name: 'Ownership Declaration' }),
     ).toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: 'Open live form' })[0]).toHaveAttribute(
+    expect(getVersionRow('v1').getByRole('link', { name: 'Open live form' })).toHaveAttribute(
       'href',
       '/f/ownership-declaration',
     );
-    expect(screen.getByText('Current live')).toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: 'Edit draft' })[0]).toHaveAttribute(
+    expect(getVersionRow('v1').getByText('Current live')).toBeInTheDocument();
+    expect(getVersionRow('v2').getByRole('link', { name: 'Edit draft' })).toHaveAttribute(
       'href',
       '/forms/ownership-declaration/edit?version=2',
     );
@@ -446,7 +449,7 @@ describe('ManageFormPageClient', () => {
     renderWithQueryClient();
 
     await screen.findByRole('heading', { name: 'Ownership Declaration' });
-    expect(screen.getAllByRole('link', { name: 'Open live form' })[0]).toHaveAttribute(
+    expect(getVersionRow('v2').getByRole('link', { name: 'Open live form' })).toHaveAttribute(
       'href',
       '/f/ownership-declaration',
     );

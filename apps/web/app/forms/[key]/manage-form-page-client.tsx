@@ -27,7 +27,7 @@ import {
   getManageForm,
   listFormVersions,
   listSubmissions,
-  type FormVersionResponse,
+  type FormVersionSummaryResponse,
   type ManageFormResponse,
   publishVersion,
   type SubmissionListResponse,
@@ -184,7 +184,7 @@ function ManageFormContent({
   submissions?: SubmissionListResponse;
   submissionsError: Error | null;
   submissionsLoading: boolean;
-  versions?: FormVersionResponse[];
+  versions?: FormVersionSummaryResponse[];
   versionsError: Error | null;
   versionsLoading: boolean;
   onCreateDraft: () => void;
@@ -212,12 +212,7 @@ function ManageFormContent({
 
         <div className="flex flex-wrap items-center gap-2">
           {form.publishedVersion ? (
-            <Button asChild variant="outline">
-              <Link href={`/f/${form.key}`}>
-                <ExternalLink data-icon="inline-start" />
-                Open live form
-              </Link>
-            </Button>
+            <LiveFormLinkButton formKey={form.key} />
           ) : (
             <Button disabled variant="outline">
               <ExternalLink data-icon="inline-start" />
@@ -225,12 +220,7 @@ function ManageFormContent({
             </Button>
           )}
           {form.version.status === 'DRAFT' ? (
-            <Button asChild variant="outline">
-              <Link href={`/forms/${form.key}/edit?version=${form.version.version}`}>
-                <Edit3 data-icon="inline-start" />
-                Edit draft
-              </Link>
-            </Button>
+            <EditDraftLinkButton formKey={form.key} version={form.version.version} />
           ) : (
             <Button disabled={isCreatingDraft} onClick={onCreateDraft} variant="outline">
               <Edit3 data-icon="inline-start" />
@@ -315,14 +305,16 @@ function VersionHistory({
   latestVersion: number;
   loading: boolean;
   publishedVersion: number | null;
-  versions?: FormVersionResponse[];
+  versions?: FormVersionSummaryResponse[];
 }) {
   const ordered = versions?.slice().sort((a, b) => b.version - a.version) ?? [];
 
   return (
-    <Card className="rounded">
+    <Card aria-labelledby="version-history-title" className="rounded" role="region">
       <CardHeader className="border-b">
-        <CardTitle className="text-xl">Version history</CardTitle>
+        <CardTitle className="text-xl" id="version-history-title">
+          Version history
+        </CardTitle>
         <p className="text-sm text-muted-foreground">
           Track drafts and published versions without exposing the underlying configuration.
         </p>
@@ -368,9 +360,8 @@ function VersionHistoryRow({
   formKey: string;
   isCurrentLive: boolean;
   isLatest: boolean;
-  version: FormVersionResponse;
+  version: FormVersionSummaryResponse;
 }) {
-  const fieldSummary = summarizeVersionFields(version);
   const status = formatStatus(version.status);
   const dateLabel =
     version.status === 'PUBLISHED' && version.publishedAt
@@ -378,48 +369,107 @@ function VersionHistoryRow({
       : `Created ${formatDateDistance(version.createdAt)}`;
 
   return (
-    <div className="flex flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+    <article
+      aria-label={`Version v${version.version}`}
+      className="flex flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between"
+    >
       <div className="min-w-0 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-lg font-semibold tracking-normal">v{version.version}</h2>
           <FormStatusBadge status={status} />
-          {isLatest ? (
-            <span className="rounded bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
-              Latest
-            </span>
-          ) : null}
-          {isCurrentLive ? (
-            <span className="rounded bg-success/15 px-2 py-1 text-xs font-medium text-success">
-              Current live
-            </span>
-          ) : null}
+          {isLatest ? <VersionMarker tone="muted">Latest</VersionMarker> : null}
+          {isCurrentLive ? <VersionMarker tone="success">Current live</VersionMarker> : null}
         </div>
         <p className="text-sm text-muted-foreground">
-          {fieldSummary.fieldCount} {fieldSummary.fieldCount === 1 ? 'field' : 'fields'} ·{' '}
-          {fieldSummary.requiredCount} required · {dateLabel}
+          {version.fieldCount} {version.fieldCount === 1 ? 'field' : 'fields'} ·{' '}
+          {version.requiredCount} required · {dateLabel}
         </p>
       </div>
 
+      <VersionHistoryAction
+        formKey={formKey}
+        isCurrentLive={isCurrentLive}
+        status={version.status}
+        version={version.version}
+      />
+    </article>
+  );
+}
+
+function VersionMarker({
+  children,
+  tone,
+}: {
+  children: React.ReactNode;
+  tone: 'muted' | 'success';
+}) {
+  const toneClass =
+    tone === 'success' ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground';
+
+  return <span className={`rounded px-2 py-1 text-xs font-medium ${toneClass}`}>{children}</span>;
+}
+
+function VersionHistoryAction({
+  formKey,
+  isCurrentLive,
+  status,
+  version,
+}: {
+  formKey: string;
+  isCurrentLive: boolean;
+  status: FormVersionSummaryResponse['status'];
+  version: number;
+}) {
+  if (status === 'DRAFT') {
+    return (
       <div className="flex flex-wrap items-center gap-2">
-        {version.status === 'DRAFT' ? (
-          <Button asChild size="sm" variant="outline">
-            <Link href={`/forms/${formKey}/edit?version=${version.version}`}>
-              <Edit3 data-icon="inline-start" />
-              Edit draft
-            </Link>
-          </Button>
-        ) : isCurrentLive ? (
-          <Button asChild size="sm" variant="outline">
-            <Link href={`/f/${formKey}`}>
-              <ExternalLink data-icon="inline-start" />
-              Open live form
-            </Link>
-          </Button>
-        ) : (
-          <span className="text-sm text-muted-foreground">Immutable</span>
-        )}
+        <EditDraftLinkButton formKey={formKey} size="sm" version={version} />
       </div>
+    );
+  }
+
+  if (isCurrentLive) {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <LiveFormLinkButton formKey={formKey} size="sm" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-sm text-muted-foreground">Immutable</span>
     </div>
+  );
+}
+
+function LiveFormLinkButton({ formKey, size }: { formKey: string; size?: 'default' | 'sm' }) {
+  return (
+    <Button asChild size={size} variant="outline">
+      <Link href={`/f/${formKey}`}>
+        <ExternalLink data-icon="inline-start" />
+        Open live form
+      </Link>
+    </Button>
+  );
+}
+
+function EditDraftLinkButton({
+  formKey,
+  size,
+  version,
+}: {
+  formKey: string;
+  size?: 'default' | 'sm';
+  version: number;
+}) {
+  return (
+    <Button asChild size={size} variant="outline">
+      <Link href={`/forms/${formKey}/edit?version=${version}`}>
+        <Edit3 data-icon="inline-start" />
+        Edit draft
+      </Link>
+    </Button>
   );
 }
 
@@ -489,15 +539,7 @@ function summarizeFields(schema: unknown, uiSchema: unknown): FieldSummary[] {
   }));
 }
 
-function summarizeVersionFields(version: FormVersionResponse) {
-  const fields = schemaFieldRecords(version.schema, version.uiSchema);
-  return {
-    fieldCount: fields.length,
-    requiredCount: fields.filter((field) => field.required).length,
-  };
-}
-
-function formatStatus(status: FormVersionResponse['status']) {
+function formatStatus(status: FormVersionSummaryResponse['status']) {
   return status === 'PUBLISHED' ? 'Published' : status === 'ARCHIVED' ? 'Archived' : 'Draft';
 }
 
