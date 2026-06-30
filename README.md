@@ -233,6 +233,57 @@ app has realistic review data before the API starts.
 - Frontend data fetching uses TanStack Query with centralized query keys.
 - Concept mockups in `docs/mockups/` were generated with Codex Image Gen 2.
 
+## Trade-off Analysis
+
+### Design Decisions
+
+- **Database schema:** the relational core is `Form → FormVersion → Submission`.
+  `Form` is the stable identity, `FormVersion` stores versioned `schema` and
+  `uiSchema` as PostgreSQL `jsonb`, and `Submission` stores validated response
+  data while pinning the exact `formVersionId`. This keeps relationships and
+  integrity relational while allowing dynamic form shapes without migrations per
+  form edit.
+- **Routing structure:** authoring routes live under `/forms`, while public
+  submission routes live under `/f`. The API mirrors this separation with a
+  published render read (`GET /forms/:key`) and an authoring read
+  (`GET /forms/:key/manage`) so draft-only forms can be managed without exposing
+  drafts to submitters.
+- **Validation strategy:** rules live in JSON Schema, not hardcoded field checks.
+  Both API and web import `@formbuilder/shared`, so client-side validation is a
+  UX preview of the same Ajv engine the server uses authoritatively.
+
+### Implementation Details
+
+- **Error handling:** the API uses DTO validation for request shape and domain
+  exceptions for business rules. A global exception filter returns a stable
+  `{ error: { code, message, details? } }` envelope; schema/submission failures
+  return `422` with field-level details the frontend can map back to inputs.
+- **Data consistency:** submissions are only written after server validation
+  against the current published version. Publishing freezes a draft version, and
+  attempts to edit or republish immutable versions return `409`.
+- **Historical integrity:** a stored submission remains valid because it points to
+  the immutable `FormVersion` that validated it. New form changes create a new
+  draft/published version; older submissions keep their original `formVersionId`.
+
+### Trade-offs and Production Scaling
+
+- **Version FK over schema snapshot:** this avoids duplicating schema JSON on every
+  submission and keeps "all submissions for v2" easy to query. The trade-off is
+  that version immutability must be enforced strictly. If deletion of version rows
+  ever became a requirement, adding a submission schema snapshot would be the next
+  durability layer.
+- **JSONB over per-field tables:** JSONB supports arbitrary form structures and
+  avoids migrations for every field change. The trade-off is fewer relational
+  constraints inside answers. At scale, add GIN indexes or extracted reporting
+  tables for fields that need frequent filtering/analytics.
+- **Synchronous validation now, cached validation later:** compiling Ajv validators
+  per request is simple for the assessment. In production, cache compiled
+  validators by immutable `formVersionId`.
+- **Simple deployment path now:** Railway and Docker Compose run migrations and an
+  idempotent seed before API startup for reviewability. In a larger cloud setup,
+  move migrations/seeding to explicit release jobs, run stateless API replicas
+  behind a load balancer, and add authentication/roles around publishing.
+
 ## With More Time
 
 - Authentication, roles, and multi-tenant ownership boundaries.

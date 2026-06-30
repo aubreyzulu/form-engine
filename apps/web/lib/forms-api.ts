@@ -123,6 +123,10 @@ export function getFormVersion(key: string, version: number) {
   return apiRequest<FormVersionResponse>(`/forms/${key}/versions/${version}`);
 }
 
+export function listFormVersions(key: string) {
+  return apiRequest<FormVersionResponse[]>(`/forms/${key}/versions`);
+}
+
 export async function createFormDraft(payload: CreateFormPayload): Promise<DraftIdentity> {
   const response = await apiRequest<Record<string, unknown>>('/forms', {
     method: 'POST',

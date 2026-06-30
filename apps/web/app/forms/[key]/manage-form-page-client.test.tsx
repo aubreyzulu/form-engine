@@ -122,6 +122,55 @@ const draftWithLiveVersionResponse = {
   publishedVersion: 1,
 };
 
+const draftVersionsResponse = [
+  {
+    id: 'version-1',
+    formId: 'form-1',
+    version: 1,
+    status: 'PUBLISHED',
+    schema: {
+      type: 'object',
+      properties: {
+        fullName: { type: 'string' },
+        acceptedTerms: { type: 'boolean' },
+      },
+      required: ['fullName'],
+      additionalProperties: false,
+    },
+    uiSchema: {
+      order: ['fullName', 'acceptedTerms'],
+      fields: {
+        fullName: { widget: 'text', label: 'Full legal name' },
+        acceptedTerms: { widget: 'checkbox', label: 'Terms accepted' },
+      },
+    },
+    publishedAt: '2026-06-27T10:00:00.000Z',
+    createdAt: '2026-06-27T09:00:00.000Z',
+    updatedAt: '2026-06-27T10:00:00.000Z',
+  },
+  {
+    id: 'version-2',
+    formId: 'form-1',
+    version: 2,
+    status: 'DRAFT',
+    schema: draftManageResponse.version.schema,
+    uiSchema: draftManageResponse.version.uiSchema,
+    publishedAt: null,
+    createdAt: '2026-06-28T10:00:00.000Z',
+    updatedAt: '2026-06-28T10:00:00.000Z',
+  },
+];
+
+const publishedVersionsResponse = [
+  draftVersionsResponse[0],
+  {
+    ...draftVersionsResponse[1],
+    status: 'PUBLISHED',
+    publishedAt: '2026-06-28T11:00:00.000Z',
+    updatedAt: '2026-06-28T11:00:00.000Z',
+  },
+];
+
 const versionOneSchema = {
   type: 'object',
   properties: {
@@ -231,6 +280,7 @@ describe('ManageFormPageClient', () => {
   it('renders the authoring response as a friendly field summary', async () => {
     const fetchMock = mockFetchRoutes({
       '/forms/ownership-declaration/manage': [okResponse(draftManageResponse)],
+      '/forms/ownership-declaration/versions': [okResponse(draftVersionsResponse)],
       '/forms/ownership-declaration/submissions': [okResponse(submissionsResponse)],
     });
 
@@ -239,14 +289,23 @@ describe('ManageFormPageClient', () => {
     expect(
       await screen.findByRole('heading', { name: 'Ownership Declaration' }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Draft')).toBeInTheDocument();
-    expect(screen.getByText('v2')).toBeInTheDocument();
+    expect(screen.getAllByText('Draft').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('v2').length).toBeGreaterThan(0);
     expect(screen.getByText('12')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
     expect(screen.getByText('1 required')).toBeInTheDocument();
     expect(screen.queryByText('Latest configuration')).not.toBeInTheDocument();
     expect(screen.queryByRole('cell', { name: 'Country' })).not.toBeInTheDocument();
     expect(screen.queryByRole('cell', { name: 'country' })).not.toBeInTheDocument();
+    expect(screen.getByText('Version history')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'v2' })).toBeInTheDocument();
+    expect(screen.getByText('Latest')).toBeInTheDocument();
+    expect(
+      screen.getAllByText((_, element) => {
+        const text = element?.textContent ?? '';
+        return text.includes('2 fields') && text.includes('1 required');
+      }).length,
+    ).toBeGreaterThan(0);
     expect(screen.getAllByText(/fullName: Ada Lovelace/)).toHaveLength(2);
     expect(screen.getAllByText(/acceptedTerms: Yes/)).toHaveLength(2);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -267,6 +326,7 @@ describe('ManageFormPageClient', () => {
     const user = userEvent.setup();
     mockFetchRoutes({
       '/forms/ownership-declaration/manage': [okResponse(draftManageResponse)],
+      '/forms/ownership-declaration/versions': [okResponse(draftVersionsResponse)],
       '/forms/ownership-declaration/submissions': [okResponse(multipleSubmissionsResponse)],
     });
 
@@ -295,6 +355,10 @@ describe('ManageFormPageClient', () => {
         errorResponse(500, 'Could not load this form.'),
         okResponse(draftManageResponse),
       ],
+      '/forms/ownership-declaration/versions': [
+        okResponse(draftVersionsResponse),
+        okResponse(draftVersionsResponse),
+      ],
       '/forms/ownership-declaration/submissions': [
         errorResponse(500, 'Could not load submissions.'),
         okResponse(emptySubmissionsResponse),
@@ -307,7 +371,7 @@ describe('ManageFormPageClient', () => {
 
     await user.click(screen.getByRole('button', { name: 'Retry' }));
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(6));
     expect(
       await screen.findByRole('heading', { name: 'Ownership Declaration' }),
     ).toBeInTheDocument();
@@ -316,6 +380,7 @@ describe('ManageFormPageClient', () => {
   it('keeps the live form link visible when the latest version is a draft', async () => {
     mockFetchRoutes({
       '/forms/ownership-declaration/manage': [okResponse(draftWithLiveVersionResponse)],
+      '/forms/ownership-declaration/versions': [okResponse(draftVersionsResponse)],
       '/forms/ownership-declaration/submissions': [okResponse(emptySubmissionsResponse)],
     });
 
@@ -324,11 +389,12 @@ describe('ManageFormPageClient', () => {
     expect(
       await screen.findByRole('heading', { name: 'Ownership Declaration' }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Open live form' })).toHaveAttribute(
+    expect(screen.getAllByRole('link', { name: 'Open live form' })[0]).toHaveAttribute(
       'href',
       '/f/ownership-declaration',
     );
-    expect(screen.getByRole('link', { name: 'Edit draft' })).toHaveAttribute(
+    expect(screen.getByText('Current live')).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Edit draft' })[0]).toHaveAttribute(
       'href',
       '/forms/ownership-declaration/edit?version=2',
     );
@@ -341,6 +407,10 @@ describe('ManageFormPageClient', () => {
         okResponse(draftManageResponse),
         okResponse(publishedManageResponse),
       ],
+      '/forms/ownership-declaration/versions': [
+        okResponse(draftVersionsResponse),
+        okResponse(publishedVersionsResponse),
+      ],
       '/forms/ownership-declaration/submissions': [okResponse(emptySubmissionsResponse)],
       '/forms/ownership-declaration/versions/2/publish': [okResponse({})],
     });
@@ -350,7 +420,7 @@ describe('ManageFormPageClient', () => {
     await screen.findByRole('heading', { name: 'Ownership Declaration' });
     await user.click(screen.getByRole('button', { name: 'Publish draft' }));
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(6));
     expect(fetchMock).toHaveBeenCalledWith(
       'http://localhost:4000/api/v1/forms/ownership-declaration/versions/2/publish',
       expect.objectContaining({ method: 'POST' }),
@@ -365,14 +435,18 @@ describe('ManageFormPageClient', () => {
         okResponse(publishedManageResponse),
         okResponse(draftManageResponse),
       ],
+      '/forms/ownership-declaration/versions': [
+        okResponse(publishedVersionsResponse),
+        okResponse({ version: 3 }),
+        okResponse(draftVersionsResponse),
+      ],
       '/forms/ownership-declaration/submissions': [okResponse(emptySubmissionsResponse)],
-      '/forms/ownership-declaration/versions': [okResponse({ version: 3 })],
     });
 
     renderWithQueryClient();
 
     await screen.findByRole('heading', { name: 'Ownership Declaration' });
-    expect(screen.getByRole('link', { name: 'Open live form' })).toHaveAttribute(
+    expect(screen.getAllByRole('link', { name: 'Open live form' })[0]).toHaveAttribute(
       'href',
       '/f/ownership-declaration',
     );
