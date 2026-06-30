@@ -74,6 +74,19 @@ pnpm-workspace.yaml pnpm workspace package map
 rules belong in JSON Schema and the shared validator, not duplicated in API or
 frontend conditionals.
 
+## Tools Used
+
+- **Codex:** implementation, refactoring, testing, README updates, and PR
+  preparation.
+- **Claude Code:** paired implementation and debugging support during earlier
+  form-builder and review passes.
+- **CodeRabbit:** automated PR code review for regressions, edge cases, and
+  maintainability feedback.
+- **Macroscope:** automated PR review focused on correctness, browser/runtime
+  compatibility, and regression risks.
+- **ChatGPT Image Gen 2:** concept mockups used to guide the reviewer-facing UI
+  direction.
+
 ## Prerequisites
 
 - Node.js 20+
