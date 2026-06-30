@@ -317,7 +317,7 @@ function VersionHistory({
   publishedVersion: number | null;
   versions?: FormVersionResponse[];
 }) {
-  const ordered = versions?.toSorted((a, b) => b.version - a.version) ?? [];
+  const ordered = versions?.slice().sort((a, b) => b.version - a.version) ?? [];
 
   return (
     <Card className="rounded">
