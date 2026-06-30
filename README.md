@@ -15,6 +15,32 @@ exact form version that accepted it.
 - Persist responses against the exact `formVersionId` used for validation.
 - Expose REST API docs through Swagger.
 
+## Reviewer Evidence Map
+
+| Assessment concern         | Where it is handled                                                                                                                                      |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dynamic form configuration | Forms are stored as JSON Schema + `uiSchema` in `FormVersion`, then rendered by the shared schema renderer. No user-facing form is hardcoded.            |
+| Strong validation          | `@formbuilder/shared` wraps Ajv and is imported by both the API and web app. The server re-validates every submission before write.                      |
+| Historical integrity       | Published versions are immutable. Each submission stores `formVersionId`, so old responses stay attached to the exact rules that accepted them.          |
+| Form evolution             | Editing a published form creates a new draft version. The manage page shows version history, current live version, drafts, and immutable older versions. |
+| Error handling             | API errors use a consistent `{ error: { code, message, details? } }` envelope; validation details map back to fields in the frontend.                    |
+| Three UI states            | API-backed screens include loading skeletons, retryable error states, empty states, and success/confirmation paths covered by frontend tests.            |
+| Deployment readiness       | Docker Compose runs the full stack locally; Railway runs migrations and an idempotent seed before API startup; Swagger is available on the hosted API.   |
+| Trade-off explanation      | See [Trade-off Analysis](#trade-off-analysis) for schema, routing, validation, consistency, and production-scaling decisions.                            |
+
+## Fast Review Path
+
+Use the hosted deployment first:
+
+- Open the web app: `https://form-engine.aubreyzulu.com`
+- Inspect API docs: `https://form-engine-api.up.railway.app/api/docs`
+- Open a seeded form such as `/forms/grant-due-diligence`, review its version
+  history and submissions, then open `/f/grant-due-diligence` to submit a live
+  response.
+
+For local review, `docker compose up --build` starts Postgres, API, migrations,
+seed data, and the web app with one command.
+
 ## Codebase Structure
 
 ```text
@@ -47,6 +73,19 @@ pnpm-workspace.yaml pnpm workspace package map
 `@formbuilder/shared` is imported by both `apps/api` and `apps/web`. Validation
 rules belong in JSON Schema and the shared validator, not duplicated in API or
 frontend conditionals.
+
+## Tools Used
+
+- **Codex:** implementation, refactoring, testing, README updates, and PR
+  preparation.
+- **Claude Code:** paired implementation and debugging support during earlier
+  form-builder and review passes.
+- **CodeRabbit:** automated PR code review for regressions, edge cases, and
+  maintainability feedback.
+- **Macroscope:** automated PR review focused on correctness, browser/runtime
+  compatibility, and regression risks.
+- **ChatGPT Image Gen 2:** concept mockups used to guide the reviewer-facing UI
+  direction.
 
 ## Prerequisites
 
@@ -174,10 +213,13 @@ Local URLs:
 
 The Railway deployment is public and does not require credentials:
 
-- Web app: `https://form-engine.aubreyzulu.com`
-- API base: `https://form-engine-api.up.railway.app/api/v1`
-- Swagger docs: `https://form-engine-api.up.railway.app/api/docs`
-- Health check: `https://form-engine-api.up.railway.app/api/v1/health`
+- Web app: [https://form-engine.aubreyzulu.com](https://form-engine.aubreyzulu.com)
+- API base:
+  [https://form-engine-api.up.railway.app/api/v1](https://form-engine-api.up.railway.app/api/v1)
+- Swagger docs:
+  [https://form-engine-api.up.railway.app/api/docs](https://form-engine-api.up.railway.app/api/docs)
+- Health check:
+  [https://form-engine-api.up.railway.app/api/v1/health](https://form-engine-api.up.railway.app/api/v1/health)
 
 Railway deploys the API from `main` with `pnpm start:api`. That command runs
 `pnpm railway:api:release` before starting Nest, so checked-in migrations and the
@@ -232,6 +274,57 @@ app has realistic review data before the API starts.
   server.
 - Frontend data fetching uses TanStack Query with centralized query keys.
 - Concept mockups in `docs/mockups/` were generated with Codex Image Gen 2.
+
+## Trade-off Analysis
+
+### Design Decisions
+
+- **Database schema:** the relational core is `Form → FormVersion → Submission`.
+  `Form` is the stable identity, `FormVersion` stores versioned `schema` and
+  `uiSchema` as PostgreSQL `jsonb`, and `Submission` stores validated response
+  data while pinning the exact `formVersionId`. This keeps relationships and
+  integrity relational while allowing dynamic form shapes without migrations per
+  form edit.
+- **Routing structure:** authoring routes live under `/forms`, while public
+  submission routes live under `/f`. The API mirrors this separation with a
+  published render read (`GET /forms/:key`) and an authoring read
+  (`GET /forms/:key/manage`) so draft-only forms can be managed without exposing
+  drafts to submitters.
+- **Validation strategy:** rules live in JSON Schema, not hardcoded field checks.
+  Both API and web import `@formbuilder/shared`, so client-side validation is a
+  UX preview of the same Ajv engine the server uses authoritatively.
+
+### Implementation Details
+
+- **Error handling:** the API uses DTO validation for request shape and domain
+  exceptions for business rules. A global exception filter returns a stable
+  `{ error: { code, message, details? } }` envelope; schema/submission failures
+  return `422` with field-level details the frontend can map back to inputs.
+- **Data consistency:** submissions are only written after server validation
+  against the current published version. Publishing freezes a draft version, and
+  attempts to edit or republish immutable versions return `409`.
+- **Historical integrity:** a stored submission remains valid because it points to
+  the immutable `FormVersion` that validated it. New form changes create a new
+  draft/published version; older submissions keep their original `formVersionId`.
+
+### Trade-offs and Production Scaling
+
+- **Version FK over schema snapshot:** this avoids duplicating schema JSON on every
+  submission and keeps "all submissions for v2" easy to query. The trade-off is
+  that version immutability must be enforced strictly. If deletion of version rows
+  ever became a requirement, adding a submission schema snapshot would be the next
+  durability layer.
+- **JSONB over per-field tables:** JSONB supports arbitrary form structures and
+  avoids migrations for every field change. The trade-off is fewer relational
+  constraints inside answers. At scale, add GIN indexes or extracted reporting
+  tables for fields that need frequent filtering/analytics.
+- **Synchronous validation now, cached validation later:** compiling Ajv validators
+  per request is simple for the assessment. In production, cache compiled
+  validators by immutable `formVersionId`.
+- **Simple deployment path now:** Railway and Docker Compose run migrations and an
+  idempotent seed before API startup for reviewability. In a larger cloud setup,
+  move migrations/seeding to explicit release jobs, run stateless API replicas
+  behind a load balancer, and add authentication/roles around publishing.
 
 ## With More Time
 

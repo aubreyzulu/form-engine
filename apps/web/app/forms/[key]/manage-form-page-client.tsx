@@ -25,7 +25,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   createDraftVersion,
   getManageForm,
+  listFormVersions,
   listSubmissions,
+  type FormVersionSummaryResponse,
   type ManageFormResponse,
   publishVersion,
   type SubmissionListResponse,
@@ -66,11 +68,21 @@ export function ManageFormPageClient({ formKey }: ManageFormPageClientProps) {
     queryKey: submissionsKeys.byForm(formKey),
     queryFn: () => listSubmissions(formKey),
   });
+  const {
+    data: versions,
+    error: versionsError,
+    isLoading: versionsLoading,
+    refetch: refetchVersions,
+  } = useQuery({
+    queryKey: formsKeys.versions(formKey),
+    queryFn: () => listFormVersions(formKey),
+  });
   const publishMutation = useMutation({
     mutationFn: publishVersion,
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: formsKeys.latest(formKey) }),
+        queryClient.invalidateQueries({ queryKey: formsKeys.versions(formKey) }),
         queryClient.invalidateQueries({ queryKey: formsKeys.list() }),
         queryClient.invalidateQueries({ queryKey: formsKeys.published(formKey) }),
       ]);
@@ -112,6 +124,7 @@ export function ManageFormPageClient({ formKey }: ManageFormPageClientProps) {
                 onClick={() => {
                   void refetch();
                   void refetchSubmissions();
+                  void refetchVersions();
                 }}
                 size="sm"
                 variant="outline"
@@ -131,6 +144,9 @@ export function ManageFormPageClient({ formKey }: ManageFormPageClientProps) {
             submissions={submissions}
             submissionsError={submissionsError}
             submissionsLoading={submissionsLoading}
+            versions={versions}
+            versionsError={versionsError}
+            versionsLoading={versionsLoading}
             onCreateDraft={() => createDraftMutation.mutate(form.key)}
             onPublish={() =>
               publishMutation.mutate({
@@ -154,6 +170,9 @@ function ManageFormContent({
   submissions,
   submissionsError,
   submissionsLoading,
+  versions,
+  versionsError,
+  versionsLoading,
   onCreateDraft,
   onPublish,
 }: {
@@ -165,6 +184,9 @@ function ManageFormContent({
   submissions?: SubmissionListResponse;
   submissionsError: Error | null;
   submissionsLoading: boolean;
+  versions?: FormVersionSummaryResponse[];
+  versionsError: Error | null;
+  versionsLoading: boolean;
   onCreateDraft: () => void;
   onPublish: () => void;
 }) {
@@ -190,12 +212,7 @@ function ManageFormContent({
 
         <div className="flex flex-wrap items-center gap-2">
           {form.publishedVersion ? (
-            <Button asChild variant="outline">
-              <Link href={`/f/${form.key}`}>
-                <ExternalLink data-icon="inline-start" />
-                Open live form
-              </Link>
-            </Button>
+            <LiveFormLinkButton formKey={form.key} />
           ) : (
             <Button disabled variant="outline">
               <ExternalLink data-icon="inline-start" />
@@ -203,12 +220,7 @@ function ManageFormContent({
             </Button>
           )}
           {form.version.status === 'DRAFT' ? (
-            <Button asChild variant="outline">
-              <Link href={`/forms/${form.key}/edit?version=${form.version.version}`}>
-                <Edit3 data-icon="inline-start" />
-                Edit draft
-              </Link>
-            </Button>
+            <EditDraftLinkButton formKey={form.key} version={form.version.version} />
           ) : (
             <Button disabled={isCreatingDraft} onClick={onCreateDraft} variant="outline">
               <Edit3 data-icon="inline-start" />
@@ -261,6 +273,15 @@ function ManageFormContent({
         />
       </section>
 
+      <VersionHistory
+        formKey={form.key}
+        latestVersion={form.version.version}
+        publishedVersion={form.publishedVersion}
+        versions={versions}
+        error={versionsError}
+        loading={versionsLoading}
+      />
+
       <SubmissionResponseViewer
         error={submissionsError}
         fields={fields}
@@ -268,6 +289,187 @@ function ManageFormContent({
         submissions={submissions}
       />
     </>
+  );
+}
+
+function VersionHistory({
+  error,
+  formKey,
+  latestVersion,
+  loading,
+  publishedVersion,
+  versions,
+}: {
+  error: Error | null;
+  formKey: string;
+  latestVersion: number;
+  loading: boolean;
+  publishedVersion: number | null;
+  versions?: FormVersionSummaryResponse[];
+}) {
+  const ordered = versions?.slice().sort((a, b) => b.version - a.version) ?? [];
+
+  return (
+    <Card aria-labelledby="version-history-title" className="rounded" role="region">
+      <CardHeader className="border-b">
+        <CardTitle className="text-xl" id="version-history-title">
+          Version history
+        </CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Track drafts and published versions without exposing the underlying configuration.
+        </p>
+      </CardHeader>
+      <CardContent className="p-0">
+        {loading ? (
+          <output className="block space-y-3 p-6" aria-label="Loading versions">
+            <Skeleton className="h-5 w-full" />
+            <Skeleton className="h-5 w-5/6" />
+            <Skeleton className="h-5 w-2/3" />
+          </output>
+        ) : error ? (
+          <Alert className="m-6" variant="destructive">
+            <AlertTitle>Version history could not be loaded</AlertTitle>
+            <AlertDescription>{error.message}</AlertDescription>
+          </Alert>
+        ) : ordered.length > 0 ? (
+          <div className="divide-y">
+            {ordered.map((version) => (
+              <VersionHistoryRow
+                formKey={formKey}
+                isCurrentLive={publishedVersion === version.version}
+                isLatest={latestVersion === version.version}
+                key={version.id}
+                version={version}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="px-6 py-10 text-muted-foreground">No versions have been created yet.</div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function VersionHistoryRow({
+  formKey,
+  isCurrentLive,
+  isLatest,
+  version,
+}: {
+  formKey: string;
+  isCurrentLive: boolean;
+  isLatest: boolean;
+  version: FormVersionSummaryResponse;
+}) {
+  const status = formatStatus(version.status);
+  const dateLabel =
+    version.status === 'PUBLISHED' && version.publishedAt
+      ? `Published ${formatDateDistance(version.publishedAt)}`
+      : `Created ${formatDateDistance(version.createdAt)}`;
+
+  return (
+    <article
+      aria-label={`Version v${version.version}`}
+      className="flex flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between"
+    >
+      <div className="min-w-0 space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-lg font-semibold tracking-normal">v{version.version}</h2>
+          <FormStatusBadge status={status} />
+          {isLatest ? <VersionMarker tone="muted">Latest</VersionMarker> : null}
+          {isCurrentLive ? <VersionMarker tone="success">Current live</VersionMarker> : null}
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {version.fieldCount} {version.fieldCount === 1 ? 'field' : 'fields'} ·{' '}
+          {version.requiredCount} required · {dateLabel}
+        </p>
+      </div>
+
+      <VersionHistoryAction
+        formKey={formKey}
+        isCurrentLive={isCurrentLive}
+        status={version.status}
+        version={version.version}
+      />
+    </article>
+  );
+}
+
+function VersionMarker({
+  children,
+  tone,
+}: {
+  children: React.ReactNode;
+  tone: 'muted' | 'success';
+}) {
+  const toneClass =
+    tone === 'success' ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground';
+
+  return <span className={`rounded px-2 py-1 text-xs font-medium ${toneClass}`}>{children}</span>;
+}
+
+function VersionHistoryAction({
+  formKey,
+  isCurrentLive,
+  status,
+  version,
+}: {
+  formKey: string;
+  isCurrentLive: boolean;
+  status: FormVersionSummaryResponse['status'];
+  version: number;
+}) {
+  if (status === 'DRAFT') {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <EditDraftLinkButton formKey={formKey} size="sm" version={version} />
+      </div>
+    );
+  }
+
+  if (isCurrentLive) {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <LiveFormLinkButton formKey={formKey} size="sm" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-sm text-muted-foreground">Immutable</span>
+    </div>
+  );
+}
+
+function LiveFormLinkButton({ formKey, size }: { formKey: string; size?: 'default' | 'sm' }) {
+  return (
+    <Button asChild size={size} variant="outline">
+      <Link href={`/f/${formKey}`}>
+        <ExternalLink data-icon="inline-start" />
+        Open live form
+      </Link>
+    </Button>
+  );
+}
+
+function EditDraftLinkButton({
+  formKey,
+  size,
+  version,
+}: {
+  formKey: string;
+  size?: 'default' | 'sm';
+  version: number;
+}) {
+  return (
+    <Button asChild size={size} variant="outline">
+      <Link href={`/forms/${formKey}/edit?version=${version}`}>
+        <Edit3 data-icon="inline-start" />
+        Edit draft
+      </Link>
+    </Button>
   );
 }
 
@@ -335,6 +537,10 @@ function summarizeFields(schema: unknown, uiSchema: unknown): FieldSummary[] {
     widget: readString(uiField.widget) ?? readString(property.type) ?? 'custom',
     required,
   }));
+}
+
+function formatStatus(status: FormVersionSummaryResponse['status']) {
+  return status === 'PUBLISHED' ? 'Published' : status === 'ARCHIVED' ? 'Archived' : 'Draft';
 }
 
 function formatDateDistance(value: string) {
