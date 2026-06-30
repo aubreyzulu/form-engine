@@ -200,10 +200,13 @@ Local URLs:
 
 The Railway deployment is public and does not require credentials:
 
-- Web app: `https://form-engine.aubreyzulu.com`
-- API base: `https://form-engine-api.up.railway.app/api/v1`
-- Swagger docs: `https://form-engine-api.up.railway.app/api/docs`
-- Health check: `https://form-engine-api.up.railway.app/api/v1/health`
+- Web app: [https://form-engine.aubreyzulu.com](https://form-engine.aubreyzulu.com)
+- API base:
+  [https://form-engine-api.up.railway.app/api/v1](https://form-engine-api.up.railway.app/api/v1)
+- Swagger docs:
+  [https://form-engine-api.up.railway.app/api/docs](https://form-engine-api.up.railway.app/api/docs)
+- Health check:
+  [https://form-engine-api.up.railway.app/api/v1/health](https://form-engine-api.up.railway.app/api/v1/health)
 
 Railway deploys the API from `main` with `pnpm start:api`. That command runs
 `pnpm railway:api:release` before starting Nest, so checked-in migrations and the
